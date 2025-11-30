@@ -1,0 +1,645 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Социальный редактор | Профессиональный инструмент для контент-менеджеров</title>
+    
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Vue 3 CDN -->
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    
+    <!-- Font Awesome CDN -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        .editor-textarea {
+            min-height: 400px;
+            line-height: 1.6;
+        }
+        
+        .toolbar-btn {
+            transition: all 0.2s ease;
+        }
+        
+        .toolbar-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .modal-overlay {
+            background-color: rgba(0, 0, 0, 0.5);
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen p-4">
+    <div id="app" class="max-w-6xl mx-auto">
+        <!-- Заголовок -->
+        <div class="text-center mb-8">
+            <h1 class="text-3xl font-bold text-gray-800 mb-2">
+                <i class="fas fa-edit text-blue-500 mr-3"></i>
+                Социальный редактор
+            </h1>
+            <p class="text-gray-600">Профессиональный инструмент для создания контента социальных сетей</p>
+        </div>
+        
+        <!-- Основной редактор -->
+        <div class="bg-white rounded-xl shadow-2xl overflow-hidden flex flex-col min-h-[600px]">
+            <!-- Панель инструментов -->
+            <div class="border-b border-gray-200 p-4 bg-gradient-to-r from-blue-50 to-indigo-50">
+                <div class="flex flex-wrap gap-2 items-center">
+                    <!-- Буфер обмена -->
+                    <div class="flex gap-1">
+                        <button @click="cutBlock" class="toolbar-btn px-3 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 shadow-sm hover:shadow-md group">
+                            <i class="fas fa-cut text-gray-700 group-hover:text-blue-600 mr-2"></i>
+                            <span class="hidden sm:inline">Вырезать</span>
+                        </button>
+                        <button @click="copyBlock" class="toolbar-btn px-3 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 shadow-sm hover:shadow-md group">
+                            <i class="fas fa-copy text-gray-700 group-hover:text-blue-600 mr-2"></i>
+                            <span class="hidden sm:inline">Копировать</span>
+                        </button>
+                        <button @click="pasteBlock" class="toolbar-btn px-3 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 shadow-sm hover:shadow-md group">
+                            <i class="fas fa-paste text-gray-700 group-hover:text-blue-600 mr-2"></i>
+                            <span class="hidden sm:inline">Вставить</span>
+                        </button>
+                    </div>
+                    
+                    <div class="w-px h-6 bg-gray-300 mx-1"></div>
+                    
+                    <!-- История -->
+                    <div class="flex gap-1">
+                        <button @click="undo" :disabled="historyIndex <= 0" 
+                            class="toolbar-btn px-3 py-2 bg-white border border-gray-300 rounded-lg shadow-sm hover:shadow-md group"
+                            :class="historyIndex > 0 ? 'hover:bg-gray-50' : ''">
+                            <i class="fas fa-undo text-gray-700 group-hover:text-green-600 mr-2"></i>
+                            <span class="hidden sm:inline">Отменить</span>
+                        </button>
+                        <button @click="redo" :disabled="historyIndex >= history.length - 1" 
+                            class="toolbar-btn px-3 py-2 bg-white border border-gray-300 rounded-lg shadow-sm hover:shadow-md group"
+                            :class="historyIndex < history.length - 1 ? 'hover:bg-gray-50' : ''">
+                            <i class="fas fa-redo text-gray-700 group-hover:text-green-600 mr-2"></i>
+                            <span class="hidden sm:inline">Повторить</span>
+                        </button>
+                    </div>
+                    
+                    <div class="w-px h-6 bg-gray-300 mx-1"></div>
+                    
+                    <!-- Шрифты -->
+                    <div class="flex gap-2 flex-wrap">
+                        <div class="relative">
+                            <select v-model="selectedFont" class="pl-8 pr-10 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 appearance-none bg-white shadow-sm">
+                                <option v-for="font in availableFonts" :key="font.value" :value="font.value">
+                                    {{ font.name }}
+                                </option>
+                            </select>
+                            <i class="fas fa-font absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+                        </div>
+                        
+                        <div class="relative">
+                            <select v-model="fontSize" class="pl-8 pr-10 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 appearance-none bg-white shadow-sm">
+                                <option v-for="size in fontSizes" :key="size" :value="size">
+                                    {{ size }}
+                                </option>
+                            </select>
+                            <i class="fas fa-text-height absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+                        </div>
+                    </div>
+                    
+                    <div class="w-px h-6 bg-gray-300 mx-1"></div>
+                    
+                    <!-- Поиск -->
+                    <button @click="openFindReplace" class="toolbar-btn px-4 py-2 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-lg hover:from-green-600 hover:to-emerald-700 shadow-sm hover:shadow-md group flex items-center">
+                        <i class="fas fa-search mr-2 group-hover:scale-110 transition-transform"></i>
+                        <span class="hidden sm:inline">Найти и заменить</span>
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Область редактирования -->
+            <div class="flex-1 p-6 bg-gray-50">
+                <textarea 
+                    ref="textareaRef"
+                    v-model="text"
+                    @keydown="handleKeydown"
+                    class="editor-textarea w-full border-0 resize-none focus:outline-none p-6 bg-white rounded-lg shadow-inner transition-all duration-200"
+                    :style="{ fontFamily: selectedFont, fontSize: fontSize }"
+                    placeholder="Начните создавать увлекательный контент для вашей социальной сети... ✨"
+                ></textarea>
+            </div>
+            
+            <!-- Строка состояния -->
+            <div class="border-t border-gray-200 p-4 bg-white">
+                <div class="flex flex-wrap gap-6 text-sm text-gray-700 justify-center">
+                    <div class="flex items-center gap-1">
+                        <i class="fas fa-font text-blue-500"></i>
+                        <span><strong>{{ stats.charsWithSpaces }}</strong> симв.</span>
+                    </div>
+                    <div class="flex items-center gap-1">
+                        <i class="fas fa-font text-green-500"></i>
+                        <span><strong>{{ stats.charsWithoutSpaces }}</strong> симв. без пробелов</span>
+                    </div>
+                    <div class="flex items-center gap-1">
+                        <i class="fas fa-file-word text-purple-500"></i>
+                        <span><strong>{{ stats.words }}</strong> слов</span>
+                    </div>
+                    <div class="flex items-center gap-1">
+                        <i class="fas fa-sentence text-orange-500"></i>
+                        <span><strong>{{ stats.sentences }}</strong> предлож.</span>
+                    </div>
+                    <div class="flex items-center gap-1">
+                        <i class="fas fa-paragraph text-red-500"></i>
+                        <span><strong>{{ stats.paragraphs }}</strong> абз.</span>
+                    </div>
+                    <div class="flex items-center gap-1">
+                        <i class="fas fa-clock text-indigo-500"></i>
+                        <span>~<strong>{{ stats.readingTime }}</strong> мин. чтения</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Подсказка по горячим клавишам -->
+        <div class="mt-6 text-center text-sm text-gray-600">
+            <p><i class="fas fa-lightbulb text-yellow-500 mr-2"></i>
+            <strong>Горячие клавиши:</strong> Стрелки (по словам) • Ctrl+Стрелки (по символам) • Ctrl+Z (отмена) • Ctrl+Y (повтор)
+            </p>
+        </div>
+    </div>
+
+    <!-- Модальное окно поиска и замены -->
+    <div v-if="showFindReplace" class="fixed inset-0 modal-overlay flex items-center justify-center z-50 p-4">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-md">
+            <div class="flex justify-between items-center p-6 border-b border-gray-200">
+                <h3 class="text-xl font-semibold text-gray-800">
+                    <i class="fas fa-search text-green-500 mr-3"></i>
+                    Найти и заменить
+                </h3>
+                <button @click="closeFindReplace" class="text-gray-400 hover:text-gray-600 transition-colors duration-200">
+                    <i class="fas fa-times text-2xl"></i>
+                </button>
+            </div>
+            
+            <div class="p-6 space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Найти:</label>
+                    <input 
+                        id="find-input"
+                        v-model="findText" 
+                        @input="currentMatchIndex = -1"
+                        class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:border-green-500 focus:ring-2 focus:ring-green-200 transition-all duration-200"
+                        placeholder="Введите текст для поиска"
+                        @keyup.enter="findNext"
+                    >
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Заменить на:</label>
+                    <input 
+                        v-model="replaceText" 
+                        class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:border-green-500 focus:ring-2 focus:ring-green-200 transition-all duration-200"
+                        placeholder="Введите текст для замены"
+                        @keyup.enter="replaceCurrent"
+                    >
+                </div>
+                
+                <div class="flex justify-between text-sm text-gray-600 px-1">
+                    <span class="flex items-center gap-1">
+                        <i class="fas fa-hashtag text-blue-500"></i>
+                        Найдено: <strong>{{ findMatches.length }}</strong>
+                    </span>
+                    <span v-if="currentMatchIndex !== -1" class="flex items-center gap-1">
+                        <i class="fas fa-location-arrow text-green-500"></i>
+                        Текущее: <strong>{{ currentMatchIndex + 1 }}</strong>
+                    </span>
+                </div>
+                
+                <div class="flex gap-3 pt-4">
+                    <button @click="findNext" class="toolbar-btn flex-1 px-4 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 shadow-sm hover:shadow-md font-medium">
+                        <i class="fas fa-arrow-down mr-2"></i>Найти далее
+                    </button>
+                    <button @click="replaceCurrent" class="toolbar-btn flex-1 px-4 py-3 bg-green-500 text-white rounded-lg hover:bg-green-600 shadow-sm hover:shadow-md font-medium">
+                        <i class="fas fa-exchange-alt mr-2"></i>Заменить
+                    </button>
+                    <button @click="replaceAll" class="toolbar-btn flex-1 px-4 py-3 bg-red-500 text-white rounded-lg hover:bg-red-600 shadow-sm hover:shadow-md font-medium">
+                        <i class="fas fa-sync-alt mr-2"></i>Все заменить
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const { createApp, ref, computed, watch, onMounted, nextTick } = Vue;
+
+        createApp({
+            setup() {
+                // Реактивное состояние
+                const text = ref('');
+                const selectedFont = ref('Roboto');
+                const fontSize = ref('16px');
+                const showFindReplace = ref(false);
+                const findText = ref('');
+                const replaceText = ref('');
+                const currentMatchIndex = ref(-1);
+                
+                // История для отмены/повтора
+                const history = ref([]);
+                const historyIndex = ref(-1);
+                
+                // Ссылки на DOM элементы
+                const textareaRef = ref(null);
+                
+                // Шрифты
+                const availableFonts = ref([
+                    { name: 'Roboto', value: 'Roboto', category: 'sans-serif' },
+                    { name: 'Open Sans', value: 'Open Sans', category: 'sans-serif' },
+                    { name: 'Lato', value: 'Lato', category: 'sans-serif' },
+                    { name: 'Montserrat', value: 'Montserrat', category: 'sans-serif' },
+                    { name: 'Roboto Slab', value: 'Roboto Slab', category: 'serif' },
+                    { name: 'Playfair Display', value: 'Playfair Display', category: 'serif' },
+                    { name: 'Source Code Pro', value: 'Source Code Pro', category: 'monospace' }
+                ]);
+                
+                const fontSizes = ref(['12px', '14px', '16px', '18px', '20px', '24px', '28px', '32px']);
+                
+                // Вычисляемые свойства для статистики
+                const stats = computed(() => {
+                    const content = text.value;
+                    const charsWithSpaces = content.length;
+                    const charsWithoutSpaces = content.replace(/\s/g, '').length;
+                    const words = content.trim() ? content.trim().split(/\s+/).length : 0;
+                    const sentences = content.split(/[.!?]+/).filter(s => s.trim()).length;
+                    const paragraphs = content.split(/\n+/).filter(p => p.trim()).length;
+                    const readingTime = Math.ceil(words / 200);
+                    
+                    return {
+                        charsWithSpaces,
+                        charsWithoutSpaces,
+                        words,
+                        sentences,
+                        paragraphs,
+                        readingTime
+                    };
+                });
+                
+                // Поиск и замена
+                const findMatches = computed(() => {
+                    if (!findText.value) return [];
+                    
+                    const regex = new RegExp(findText.value, 'gi');
+                    const matches = [];
+                    let match;
+                    
+                    while ((match = regex.exec(text.value)) !== null) {
+                        matches.push({
+                            start: match.index,
+                            end: match.index + match[0].length
+                        });
+                    }
+                    
+                    return matches;
+                });
+                
+                // Инициализация
+                const initializeEditor = () => {
+                    text.value = 'Добро пожаловать в редактор для социальных сетей!\n\nНачните писать свой текст здесь...';
+                    saveToHistory();
+                };
+                
+                // Система истории
+                const saveToHistory = () => {
+                    const currentState = text.value;
+                    
+                    // Удаляем все состояния после текущего индекса (если мы не в конце)
+                    if (historyIndex.value < history.value.length - 1) {
+                        history.value = history.value.slice(0, historyIndex.value + 1);
+                    }
+                    
+                    // Добавляем новое состояние
+                    history.value.push(currentState);
+                    
+                    // Ограничиваем размер истории
+                    if (history.value.length > 50) {
+                        history.value.shift();
+                    }
+                    
+                    historyIndex.value = history.value.length - 1;
+                };
+                
+                const undo = () => {
+                    if (historyIndex.value > 0) {
+                        historyIndex.value--;
+                        text.value = history.value[historyIndex.value];
+                    }
+                };
+                
+                const redo = () => {
+                    if (historyIndex.value < history.value.length - 1) {
+                        historyIndex.value++;
+                        text.value = history.value[historyIndex.value];
+                    }
+                };
+                
+                // Автоматическое сохранение в историю при изменении текста
+                let historyTimeout = null;
+                watch(text, (newText, oldText) => {
+                    if (oldText !== '' && newText !== oldText) {
+                        // Дебаунсим сохранение в историю
+                        clearTimeout(historyTimeout);
+                        historyTimeout = setTimeout(saveToHistory, 500);
+                    }
+                });
+                
+                // Обработка нажатий клавиш
+                const handleKeydown = (event) => {
+                    if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+                        handleArrowNavigation(event);
+                    }
+                    
+                    // Ctrl+Z / Ctrl+Y
+                    if ((event.ctrlKey || event.metaKey) && !event.shiftKey && event.key === 'z') {
+                        event.preventDefault();
+                        undo();
+                    }
+                    if ((event.ctrlKey || event.metaKey) && event.key === 'y') {
+                        event.preventDefault();
+                        redo();
+                    }
+                };
+                
+                const handleArrowNavigation = (event) => {
+                    if (!textareaRef.value) return;
+                    
+                    const isCtrlPressed = event.ctrlKey || event.metaKey;
+                    const isMovingByWord = !isCtrlPressed; // Инвертированная логика
+                    
+                    if (isMovingByWord) {
+                        event.preventDefault();
+                        moveByWord(event.key === 'ArrowLeft' ? -1 : 1, event.shiftKey);
+                    }
+                    // Если Ctrl нажат - стандартное поведение (посимвольное) сохраняется
+                };
+                
+                const moveByWord = (direction, isSelecting) => {
+                    const textarea = textareaRef.value;
+                    const currentPos = textarea.selectionStart;
+                    const content = textarea.value;
+                    
+                    let newPos;
+                    
+                    if (direction === -1) { // Left arrow
+                        newPos = findPreviousWordBoundary(content, currentPos);
+                    } else { // Right arrow
+                        newPos = findNextWordBoundary(content, currentPos);
+                    }
+                    
+                    textarea.focus();
+                    if (isSelecting) {
+                        // Сохраняем выделение
+                        const selectionEnd = textarea.selectionEnd;
+                        textarea.setSelectionRange(
+                            direction === -1 ? newPos : Math.min(currentPos, selectionEnd),
+                            direction === 1 ? newPos : Math.max(currentPos, selectionEnd)
+                        );
+                    } else {
+                        textarea.setSelectionRange(newPos, newPos);
+                    }
+                };
+                
+                const findPreviousWordBoundary = (content, position) => {
+                    if (position <= 0) return 0;
+                    
+                    // Ищем начало предыдущего слова
+                    let i = position - 1;
+                    // Пропускаем пробелы и знаки препинания
+                    while (i > 0 && /\s|[.,!?;:]/.test(content[i])) {
+                        i--;
+                    }
+                    // Ищем начало слова
+                    while (i > 0 && !/\s|[.,!?;:]/.test(content[i - 1])) {
+                        i--;
+                    }
+                    
+                    return i;
+                };
+                
+                const findNextWordBoundary = (content, position) => {
+                    if (position >= content.length) return content.length;
+                    
+                    // Ищем конец текущего/начало следующего слова
+                    let i = position;
+                    // Пропускаем текущее слово
+                    while (i < content.length && !/\s|[.,!?;:]/.test(content[i])) {
+                        i++;
+                    }
+                    // Пропускаем пробелы и знаки препинания
+                    while (i < content.length && /\s|[.,!?;:]/.test(content[i])) {
+                        i++;
+                    }
+                    
+                    return i;
+                };
+                
+                // Блочные операции
+                const cutBlock = async () => {
+                    await copyBlock();
+                    deleteSelectedText();
+                };
+                
+                const copyBlock = async () => {
+                    const selectedText = getSelectedText();
+                    if (!selectedText) return;
+                    
+                    const blockType = determineBlockType(selectedText);
+                    const processedText = processTextForBlock(selectedText, blockType);
+                    
+                    try {
+                        await navigator.clipboard.writeText(processedText);
+                    } catch (err) {
+                        // Fallback для старых браузеров
+                        const textarea = document.createElement('textarea');
+                        textarea.value = processedText;
+                        document.body.appendChild(textarea);
+                        textarea.select();
+                        document.execCommand('copy');
+                        document.body.removeChild(textarea);
+                    }
+                };
+                
+                const pasteBlock = async () => {
+                    let clipboardText;
+                    try {
+                        clipboardText = await navigator.clipboard.readText();
+                    } catch (err) {
+                        // Fallback
+                        const textarea = document.createElement('textarea');
+                        document.body.appendChild(textarea);
+                        textarea.select();
+                        clipboardText = document.execCommand('paste') ? textarea.value : '';
+                        document.body.removeChild(textarea);
+                    }
+                    
+                    insertTextAtCursor(clipboardText);
+                };
+                
+                const determineBlockType = (selectedText) => {
+                    // Проверяем, заканчивается ли выделение на знак конца предложения
+                    const endsWithSentenceEnd = /[.!?]\s*$/.test(selectedText);
+                    const hasSpaces = /\s/.test(selectedText);
+                    
+                    if (endsWithSentenceEnd && hasSpaces) {
+                        return 'sentence';
+                    } else if (!hasSpaces || selectedText.trim().split(/\s+/).length === 1) {
+                        return 'word';
+                    }
+                    
+                    return 'text'; // Обычный текст без специальной обработки
+                };
+                
+                const processTextForBlock = (text, blockType) => {
+                    switch (blockType) {
+                        case 'word':
+                            return ` ${text.trim()} `;
+                        case 'sentence':
+                            return ` ${text.trim()} `;
+                        default:
+                            return text;
+                    }
+                };
+                
+                const getSelectedText = () => {
+                    const textarea = textareaRef.value;
+                    return textarea.value.substring(textarea.selectionStart, textarea.selectionEnd);
+                };
+                
+                const deleteSelectedText = () => {
+                    const textarea = textareaRef.value;
+                    const start = textarea.selectionStart;
+                    const end = textarea.selectionEnd;
+                    
+                    text.value = text.value.substring(0, start) + text.value.substring(end);
+                    textarea.setSelectionRange(start, start);
+                };
+                
+                const insertTextAtCursor = (newText) => {
+                    const textarea = textareaRef.value;
+                    const start = textarea.selectionStart;
+                    const end = textarea.selectionEnd;
+                    
+                    text.value = text.value.substring(0, start) + newText + text.value.substring(end);
+                    const newCursorPos = start + newText.length;
+                    nextTick(() => {
+                        textarea.setSelectionRange(newCursorPos, newCursorPos);
+                    });
+                };
+                
+                // Функции поиска и замены
+                const findNext = () => {
+                    if (findMatches.value.length === 0) return;
+                    
+                    currentMatchIndex.value = (currentMatchIndex.value + 1) % findMatches.value.length;
+                    scrollToMatch();
+                };
+                
+                const replaceCurrent = () => {
+                    if (currentMatchIndex.value === -1 || findMatches.value.length === 0) return;
+                    
+                    const match = findMatches.value[currentMatchIndex.value];
+                    const before = text.value.substring(0, match.start);
+                    const after = text.value.substring(match.end);
+                    
+                    text.value = before + replaceText.value + after;
+                    
+                    // Обновляем выделение после замены
+                    nextTick(() => {
+                        const newPos = match.start + replaceText.value.length;
+                        textareaRef.value.setSelectionRange(newPos, newPos);
+                        findNext(); // Переходим к следующему совпадению
+                    });
+                };
+                
+                const replaceAll = () => {
+                    if (!findText.value) return;
+                    
+                    const regex = new RegExp(findText.value, 'g');
+                    text.value = text.value.replace(regex, replaceText.value);
+                    currentMatchIndex.value = -1;
+                };
+                
+                const scrollToMatch = () => {
+                    if (currentMatchIndex.value === -1) return;
+                    
+                    const match = findMatches.value[currentMatchIndex.value];
+                    textareaRef.value.focus();
+                    textareaRef.value.setSelectionRange(match.start, match.end);
+                };
+                
+                const openFindReplace = () => {
+                    showFindReplace.value = true;
+                    nextTick(() => {
+                        document.querySelector('#find-input')?.focus();
+                    });
+                };
+                
+                const closeFindReplace = () => {
+                    showFindReplace.value = false;
+                    currentMatchIndex.value = -1;
+                };
+                
+                // Динамическая загрузка шрифтов
+                const loadGoogleFont = (fontFamily) => {
+                    // Проверяем, не загружен ли уже шрифт
+                    if (document.querySelector(`link[href*="${fontFamily.replace(' ', '+')}"]`)) {
+                        return;
+                    }
+                    
+                    const link = document.createElement('link');
+                    link.rel = 'stylesheet';
+                    link.href = `https://fonts.googleapis.com/css2?family=${fontFamily.replace(' ', '+')}&display=swap`;
+                    document.head.appendChild(link);
+                };
+                
+                // Загружаем начальный шрифт
+                onMounted(() => {
+                    initializeEditor();
+                    loadGoogleFont(selectedFont.value);
+                });
+                
+                watch(selectedFont, (newFont) => {
+                    loadGoogleFont(newFont);
+                });
+                
+                return {
+                    text,
+                    selectedFont,
+                    fontSize,
+                    showFindReplace,
+                    findText,
+                    replaceText,
+                    findMatches,
+                    currentMatchIndex,
+                    availableFonts,
+                    fontSizes,
+                    stats,
+                    textareaRef,
+                    historyIndex,
+                    history,
+                    cutBlock,
+                    copyBlock,
+                    pasteBlock,
+                    undo,
+                    redo,
+                    findNext,
+                    replaceCurrent,
+                    replaceAll,
+                    openFindReplace,
+                    closeFindReplace,
+                    handleKeydown
+                };
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>
