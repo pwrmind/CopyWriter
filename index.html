@@ -73,6 +73,8 @@
             resize: none;
             font-size: 16px;
             line-height: 1.5;
+            white-space: pre-wrap;
+            word-wrap: break-word;
         }
         
         .editor-area:focus {
@@ -135,6 +137,11 @@
         .current-highlight {
             background-color: orange;
         }
+        
+        /* Для обработки Enter и новых строк */
+        .editor-area[contenteditable="true"] {
+            -webkit-user-modify: read-write-plaintext-only;
+        }
     </style>
 </head>
 <body>
@@ -195,10 +202,9 @@
             contenteditable="true" 
             x-ref="editor"
             :style="`font-family: '${selectedFont}', sans-serif; font-size: ${selectedFontSize}px;`"
-            @input="updateStats"
+            @input="handleInput"
             @keydown="handleKeydown"
             @paste="handlePaste"
-            x-text="content"
         ></div>
         
         <!-- Нижняя строка состояния -->
@@ -300,6 +306,8 @@
                 
                 // Инициализация
                 init() {
+                    // Устанавливаем начальный текст
+                    this.$refs.editor.textContent = this.content;
                     this.updateStats();
                     this.saveToHistory();
                     
@@ -307,7 +315,7 @@
                     const savedContent = localStorage.getItem('editorContent');
                     if (savedContent) {
                         this.content = savedContent;
-                        this.$refs.editor.innerHTML = savedContent;
+                        this.$refs.editor.textContent = savedContent;
                         this.updateStats();
                     }
                     
@@ -317,9 +325,16 @@
                     }, 30000);
                 },
                 
+                // Обработка ввода
+                handleInput() {
+                    this.updateStats();
+                    this.saveToHistory();
+                },
+                
                 // Обновление статистики
                 updateStats() {
-                    const text = this.$refs.editor.innerText || '';
+                    const text = this.$refs.editor.textContent || '';
+                    this.content = text;
                     
                     // Символы с пробелами и без
                     this.stats.charactersWithSpaces = text.length;
@@ -341,7 +356,6 @@
                     this.stats.readingTime = Math.max(1, Math.ceil(this.stats.words / 200));
                     
                     // Сохранение контента
-                    this.content = this.$refs.editor.innerHTML;
                     this.saveContent();
                 },
                 
@@ -352,13 +366,20 @@
                 
                 // Сохранение в историю
                 saveToHistory() {
+                    const currentText = this.$refs.editor.textContent;
+                    
+                    // Если текст не изменился, не сохраняем в историю
+                    if (this.history[this.historyIndex] === currentText) {
+                        return;
+                    }
+                    
                     // Удаляем все действия после текущего индекса (если мы не в конце истории)
                     if (this.historyIndex < this.history.length - 1) {
                         this.history = this.history.slice(0, this.historyIndex + 1);
                     }
                     
                     // Добавляем текущее состояние
-                    this.history.push(this.content);
+                    this.history.push(currentText);
                     
                     // Ограничиваем глубину истории
                     if (this.history.length > 50) {
@@ -372,9 +393,13 @@
                 undo() {
                     if (this.historyIndex > 0) {
                         this.historyIndex--;
-                        this.content = this.history[this.historyIndex];
-                        this.$refs.editor.innerHTML = this.content;
+                        const previousText = this.history[this.historyIndex];
+                        this.$refs.editor.textContent = previousText;
+                        this.content = previousText;
                         this.updateStats();
+                        
+                        // Восстанавливаем позицию курсора в конец текста
+                        this.setCursorToEnd();
                     }
                 },
                 
@@ -382,10 +407,27 @@
                 redo() {
                     if (this.historyIndex < this.history.length - 1) {
                         this.historyIndex++;
-                        this.content = this.history[this.historyIndex];
-                        this.$refs.editor.innerHTML = this.content;
+                        const nextText = this.history[this.historyIndex];
+                        this.$refs.editor.textContent = nextText;
+                        this.content = nextText;
                         this.updateStats();
+                        
+                        // Восстанавливаем позицию курсора в конец текста
+                        this.setCursorToEnd();
                     }
+                },
+                
+                // Установка курсора в конец текста
+                setCursorToEnd() {
+                    const editor = this.$refs.editor;
+                    const range = document.createRange();
+                    const selection = window.getSelection();
+                    
+                    range.selectNodeContents(editor);
+                    range.collapse(false); // false - в конец
+                    
+                    selection.removeAllRanges();
+                    selection.addRange(range);
                 },
                 
                 // Проверка возможности отмены
@@ -401,13 +443,11 @@
                 // Применение шрифта
                 applyFont() {
                     this.$refs.editor.style.fontFamily = `'${this.selectedFont}', sans-serif`;
-                    this.saveToHistory();
                 },
                 
                 // Применение размера шрифта
                 applyFontSize() {
                     this.$refs.editor.style.fontSize = `${this.selectedFontSize}px`;
-                    this.saveToHistory();
                 },
                 
                 // Обработка нажатия клавиш
@@ -419,6 +459,37 @@
                             this.saveToHistory();
                         }, 0);
                     }
+                    
+                    // Обработка Enter для создания новой строки
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        this.insertTextAtCursor('\n');
+                    }
+                },
+                
+                // Вставка текста в позицию курсора
+                insertTextAtCursor(text) {
+                    const editor = this.$refs.editor;
+                    const selection = window.getSelection();
+                    
+                    if (selection.rangeCount > 0) {
+                        const range = selection.getRangeAt(0);
+                        range.deleteContents();
+                        
+                        // Создаем текстовый узел
+                        const textNode = document.createTextNode(text);
+                        range.insertNode(textNode);
+                        
+                        // Перемещаем курсор после вставленного текста
+                        range.setStartAfter(textNode);
+                        range.collapse(true);
+                        
+                        selection.removeAllRanges();
+                        selection.addRange(range);
+                    }
+                    
+                    this.updateStats();
+                    this.saveToHistory();
                 },
                 
                 // Обработка вставки текста
@@ -429,30 +500,59 @@
                     const text = e.clipboardData.getData('text/plain');
                     
                     // Вставляем текст в текущую позицию курсора
-                    document.execCommand('insertText', false, text);
-                    
-                    // Сохраняем в историю
-                    this.saveToHistory();
-                    this.updateStats();
+                    this.insertTextAtCursor(text);
                 },
                 
                 // Вырезание текста
                 cutText() {
-                    document.execCommand('cut');
-                    this.saveToHistory();
-                    this.updateStats();
+                    const editor = this.$refs.editor;
+                    const selection = window.getSelection();
+                    
+                    if (selection.toString()) {
+                        // Копируем выделенный текст в буфер обмена
+                        navigator.clipboard.writeText(selection.toString())
+                            .then(() => {
+                                // Удаляем выделенный текст
+                                const range = selection.getRangeAt(0);
+                                range.deleteContents();
+                                
+                                this.updateStats();
+                                this.saveToHistory();
+                            })
+                            .catch(err => {
+                                console.error('Ошибка при вырезании текста:', err);
+                            });
+                    }
                 },
                 
                 // Копирование текста
                 copyText() {
-                    document.execCommand('copy');
+                    const editor = this.$refs.editor;
+                    const selection = window.getSelection();
+                    
+                    if (selection.toString()) {
+                        navigator.clipboard.writeText(selection.toString())
+                            .catch(err => {
+                                console.error('Ошибка при копировании текста:', err);
+                            });
+                    }
                 },
                 
                 // Вставка текста
                 pasteText() {
-                    document.execCommand('paste');
-                    this.saveToHistory();
-                    this.updateStats();
+                    // Фокусируемся на редакторе
+                    this.$refs.editor.focus();
+                    
+                    // Используем Clipboard API для вставки
+                    navigator.clipboard.readText()
+                        .then(text => {
+                            this.insertTextAtCursor(text);
+                        })
+                        .catch(err => {
+                            console.error('Ошибка при вставке текста:', err);
+                            // Fallback для старых браузеров
+                            document.execCommand('paste');
+                        });
                 },
                 
                 // Поиск следующего совпадения
@@ -460,7 +560,7 @@
                     if (!this.searchTerm) return;
                     
                     const editor = this.$refs.editor;
-                    const text = editor.innerText || '';
+                    const text = editor.textContent || '';
                     const searchTerm = this.caseSensitive ? this.searchTerm : this.searchTerm.toLowerCase();
                     const content = this.caseSensitive ? text : text.toLowerCase();
                     
@@ -488,11 +588,11 @@
                     if (this.currentMatchIndex >= 0 && this.searchMatches.length > 0) {
                         const match = this.searchMatches[this.currentMatchIndex];
                         const editor = this.$refs.editor;
-                        const text = editor.innerText || '';
+                        const text = editor.textContent || '';
                         
                         // Заменяем текст
                         const newText = text.substring(0, match.start) + this.replaceTerm + text.substring(match.end);
-                        editor.innerText = newText;
+                        editor.textContent = newText;
                         
                         // Обновляем статистику и историю
                         this.updateStats();
@@ -516,11 +616,11 @@
                     if (!this.searchTerm) return;
                     
                     const editor = this.$refs.editor;
-                    const text = editor.innerText || '';
+                    const text = editor.textContent || '';
                     const regex = new RegExp(this.escapeRegex(this.searchTerm), this.caseSensitive ? 'g' : 'gi');
                     const newText = text.replace(regex, this.replaceTerm);
                     
-                    editor.innerText = newText;
+                    editor.textContent = newText;
                     
                     // Обновляем статистику и историю
                     this.updateStats();
@@ -542,42 +642,26 @@
                         
                         // Создаем диапазон для выделения
                         const range = document.createRange();
-                        const walker = document.createTreeWalker(
-                            editor, 
-                            NodeFilter.SHOW_TEXT, 
-                            null, 
-                            false
-                        );
                         
-                        let currentNode;
-                        let currentIndex = 0;
-                        
-                        while (currentNode = walker.nextNode()) {
-                            const nodeLength = currentNode.textContent.length;
+                        // Находим текстовый узел и позицию
+                        const textNode = editor.firstChild; // У нас только текстовый узел
+                        if (textNode && textNode.nodeType === Node.TEXT_NODE) {
+                            const startOffset = Math.min(match.start, textNode.length);
+                            const endOffset = Math.min(match.end, textNode.length);
                             
-                            // Если совпадение находится в этом узле
-                            if (match.start >= currentIndex && match.start < currentIndex + nodeLength) {
-                                const startOffset = match.start - currentIndex;
-                                const endOffset = Math.min(match.end - currentIndex, nodeLength);
-                                
-                                range.setStart(currentNode, startOffset);
-                                range.setEnd(currentNode, endOffset);
-                                
-                                // Выделяем текст
-                                const selection = window.getSelection();
-                                selection.removeAllRanges();
-                                selection.addRange(range);
-                                
-                                // Прокручиваем к выделенному тексту
-                                range.startContainer.parentElement.scrollIntoView({ 
-                                    behavior: 'smooth', 
-                                    block: 'center' 
-                                });
-                                
-                                break;
-                            }
+                            range.setStart(textNode, startOffset);
+                            range.setEnd(textNode, endOffset);
                             
-                            currentIndex += nodeLength;
+                            // Выделяем текст
+                            const selection = window.getSelection();
+                            selection.removeAllRanges();
+                            selection.addRange(range);
+                            
+                            // Прокручиваем к выделенному тексту
+                            editor.scrollIntoView({ 
+                                behavior: 'smooth', 
+                                block: 'center' 
+                            });
                         }
                     }
                 },
