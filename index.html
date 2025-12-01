@@ -412,30 +412,6 @@
                 
                 // Обработка нажатия клавиш
                 handleKeydown(e) {
-                    // Инвертированное управление для навигации
-                    if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
-                        if (!e.ctrlKey) {
-                            // По умолчанию - прыжки по словам
-                            e.preventDefault();
-                            
-                            const selection = window.getSelection();
-                            if (selection.rangeCount > 0) {
-                                const range = selection.getRangeAt(0);
-                                const node = range.startContainer;
-                                const offset = range.startOffset;
-                                
-                                if (e.key === 'ArrowLeft') {
-                                    // Перемещение к началу предыдущего слова
-                                    this.moveToPreviousWord(node, offset);
-                                } else {
-                                    // Перемещение к началу следующего слова
-                                    this.moveToNextWord(node, offset);
-                                }
-                            }
-                        }
-                        // Если нажат Ctrl, используется стандартное поведение (посимвольное перемещение)
-                    }
-                    
                     // Сохранение в историю при значимых изменениях
                     if (e.key.length === 1 || e.key === 'Backspace' || e.key === 'Delete') {
                         // Используем setTimeout, чтобы изменение успело произойти
@@ -443,104 +419,6 @@
                             this.saveToHistory();
                         }, 0);
                     }
-                },
-                
-                // Перемещение к началу предыдущего слова
-                moveToPreviousWord(node, offset) {
-                    const text = node.textContent || '';
-                    let newOffset = offset;
-                    
-                    // Если мы уже в начале узла, переходим к предыдущему узлу
-                    if (newOffset === 0) {
-                        const prevNode = this.getPreviousTextNode(node);
-                        if (prevNode) {
-                            node = prevNode;
-                            newOffset = node.textContent.length;
-                        }
-                    }
-                    
-                    // Ищем начало предыдущего слова
-                    const textBefore = text.substring(0, newOffset);
-                    const wordBoundary = textBefore.search(/\s+\S*$/);
-                    
-                    if (wordBoundary !== -1) {
-                        newOffset = wordBoundary + 1;
-                    } else {
-                        newOffset = 0;
-                    }
-                    
-                    // Устанавливаем новую позицию курсора
-                    const range = document.createRange();
-                    range.setStart(node, newOffset);
-                    range.collapse(true);
-                    
-                    const selection = window.getSelection();
-                    selection.removeAllRanges();
-                    selection.addRange(range);
-                },
-                
-                // Перемещение к началу следующего слова
-                moveToNextWord(node, offset) {
-                    const text = node.textContent || '';
-                    let newOffset = offset;
-                    
-                    // Если мы уже в конце узла, переходим к следующему узлу
-                    if (newOffset === text.length) {
-                        const nextNode = this.getNextTextNode(node);
-                        if (nextNode) {
-                            node = nextNode;
-                            newOffset = 0;
-                        }
-                    }
-                    
-                    // Ищем начало следующего слова
-                    const textAfter = text.substring(newOffset);
-                    const wordBoundary = textAfter.search(/\s/);
-                    
-                    if (wordBoundary !== -1) {
-                        newOffset += wordBoundary + 1;
-                    } else {
-                        newOffset = text.length;
-                    }
-                    
-                    // Устанавливаем новую позицию курсора
-                    const range = document.createRange();
-                    range.setStart(node, newOffset);
-                    range.collapse(true);
-                    
-                    const selection = window.getSelection();
-                    selection.removeAllRanges();
-                    selection.addRange(range);
-                },
-                
-                // Получение предыдущего текстового узла
-                getPreviousTextNode(node) {
-                    let prevNode = node.previousSibling;
-                    
-                    while (prevNode && prevNode.nodeType !== Node.TEXT_NODE) {
-                        if (prevNode.lastChild) {
-                            prevNode = prevNode.lastChild;
-                        } else {
-                            prevNode = prevNode.previousSibling;
-                        }
-                    }
-                    
-                    return prevNode;
-                },
-                
-                // Получение следующего текстового узла
-                getNextTextNode(node) {
-                    let nextNode = node.nextSibling;
-                    
-                    while (nextNode && nextNode.nodeType !== Node.TEXT_NODE) {
-                        if (nextNode.firstChild) {
-                            nextNode = nextNode.firstChild;
-                        } else {
-                            nextNode = nextNode.nextSibling;
-                        }
-                    }
-                    
-                    return nextNode;
                 },
                 
                 // Обработка вставки текста
