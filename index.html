@@ -223,13 +223,13 @@
 
                 <div class="toolbar-group">
                     <select class="form-select form-select-sm" style="width: 150px;"
-                            aria-label="Шрифт" x-model="selectedFont">
+                            aria-label="Шрифт" x-model="selectedFont" @change="saveSettings">
                         <template x-for="font in availableFonts" :key="font">
                             <option :value="font" x-text="font"></option>
                         </template>
                     </select>
                     <select class="form-select form-select-sm ms-2" style="width: 70px;"
-                            aria-label="Размер шрифта" x-model.number="selectedFontSize">
+                            aria-label="Размер шрифта" x-model.number="selectedFontSize" @change="saveSettings">
                         <template x-for="size in fontSizes" :key="size">
                             <option :value="size" x-text="size"></option>
                         </template>
@@ -264,7 +264,8 @@
                    placeholder="Заменить на" aria-label="Заменить на"
                    x-model="replaceTerm">
             <div class="form-check mb-0">
-                <input class="form-check-input" type="checkbox" id="caseSensitive" x-model="caseSensitive">
+                <input class="form-check-input" type="checkbox" id="caseSensitive"
+                       x-model="caseSensitive" @change="saveSettings">
                 <label class="form-check-label small" for="caseSensitive">С учётом регистра</label>
             </div>
             <button class="btn btn-primary btn-sm" @click="findNext">Найти</button>
@@ -425,6 +426,23 @@
                 },
 
                 init() {
+                    // --- Восстанавливаем настройки шрифта и поиска ---
+                    const savedFont = localStorage.getItem('editorFont');
+                    if (savedFont && this.availableFonts.includes(savedFont)) {
+                        this.selectedFont = savedFont;
+                    }
+
+                    const savedFontSize = parseInt(localStorage.getItem('editorFontSize'), 10);
+                    if (!isNaN(savedFontSize) && this.fontSizes.includes(savedFontSize)) {
+                        this.selectedFontSize = savedFontSize;
+                    }
+
+                    const savedCase = localStorage.getItem('editorCaseSensitive');
+                    if (savedCase !== null) {
+                        this.caseSensitive = savedCase === 'true';
+                    }
+
+                    // --- Восстанавливаем контент ---
                     const saved = localStorage.getItem('editorContent');
                     this.content = saved !== null ? saved : '';
                     this.$refs.editor.textContent = this.content;
@@ -440,7 +458,10 @@
                     this.updateStats();
 
                     this.autosaveInterval = setInterval(() => this.saveContent(), 30000);
-                    this.beforeUnloadHandler = () => this.saveContent();
+                    this.beforeUnloadHandler = () => {
+                        this.saveContent();
+                        this.saveSettings();
+                    };
                     window.addEventListener('beforeunload', this.beforeUnloadHandler);
 
                     this.onlineHandler = () => this.isOnline = true;
@@ -469,6 +490,7 @@
                     if (this.offlineHandler) window.removeEventListener('offline', this.offlineHandler);
                     if (this.installHandler) window.removeEventListener('beforeinstallprompt', this.installHandler);
                     this.saveContent();
+                    this.saveSettings();
                 },
 
                 async installPWA() {
@@ -518,6 +540,12 @@
 
                 saveContent() {
                     localStorage.setItem('editorContent', this.content);
+                },
+
+                saveSettings() {
+                    localStorage.setItem('editorFont', this.selectedFont);
+                    localStorage.setItem('editorFontSize', String(this.selectedFontSize));
+                    localStorage.setItem('editorCaseSensitive', String(this.caseSensitive));
                 },
 
                 saveToHistory() {
