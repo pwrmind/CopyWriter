@@ -33,13 +33,12 @@
     <style>
         [x-cloak] { display: none !important; }
 
-        /* === ИСПРАВЛЕНИЕ ВЫСОТЫ: fixed + inset покрывает экран целиком === */
         html, body {
             height: 100%;
             margin: 0;
             padding: 0;
             overflow: hidden;
-            background-color: #343a40; /* чтобы белых зазоров не было видно */
+            background-color: #343a40;
         }
         body {
             font-family: 'Roboto', sans-serif;
@@ -53,10 +52,12 @@
             background-color: #f8f9fa;
         }
 
+        /* Верхняя панель: белый фон уходит под системный статус-бар */
         .toolbar {
             background-color: #fff;
             border-bottom: 1px solid #dee2e6;
             padding: 8px 12px;
+            padding-top: calc(8px + env(safe-area-inset-top, 0px));
             box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
             z-index: 2;
             flex-shrink: 0;
@@ -139,13 +140,11 @@
             line-height: 1.5;
         }
 
-        /* === СТАТУС-БАР: одна строка, компактный, с safe-area снизу === */
+        /* Статус-бар: обычные отступы, safe-area — в отдельном блоке ниже */
         .status-bar {
             background-color: #343a40;
             color: #fff;
-            padding: 6px 12px;
-            /* Отступ снизу под home-индикатор iPhone */
-            padding-bottom: calc(6px + env(safe-area-inset-bottom, 0px));
+            padding: 8px 12px;
             font-size: 13px;
             display: flex;
             justify-content: space-between;
@@ -159,7 +158,13 @@
             white-space: nowrap;
         }
 
-        /* Адаптив для узких экранов */
+        /* Тёмная полоса под home-индикатором iPhone */
+        .safe-bottom {
+            height: env(safe-area-inset-bottom, 0px);
+            background-color: #343a40;
+            flex-shrink: 0;
+        }
+
         @media (max-width: 576px) {
             .toolbar-group { margin-right: 6px; }
             .toolbar-btn { padding: 5px 6px; }
@@ -168,14 +173,11 @@
             .status-bar {
                 font-size: 11px;
                 padding: 5px 10px;
-                padding-bottom: calc(5px + env(safe-area-inset-bottom, 0px));
                 gap: 8px;
             }
-            /* На мобильных показываем только компактный набор */
             .status-bar .desktop-only { display: none; }
         }
 
-        /* На широких экранах показываем расширенную версию */
         @media (min-width: 577px) {
             .status-bar .mobile-only { display: none; }
         }
@@ -319,6 +321,9 @@
                 Время чтения: ~<span x-text="stats.readingTime"></span> мин.
             </span>
         </div>
+
+        <!-- Тёмная полоса, закрывающая зону home-индикатора -->
+        <div class="safe-bottom"></div>
     </div>
 
     <!-- ===== PWA ===== -->
