@@ -2,15 +2,28 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+
     <title>Текстовый редактор для социальных сетей</title>
+
+    <!-- ===== PWA ===== -->
+    <meta name="theme-color" content="#343a40">
+    <meta name="description" content="Плаин-текстовый редактор с поиском, заменой и статистикой">
+    <link rel="manifest" id="pwa-manifest">
+
+    <!-- iOS PWA -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Редактор">
+    <link rel="apple-touch-icon" id="apple-touch-icon">
+
+    <!-- Иконка во вкладке -->
+    <link rel="icon" id="favicon">
 
     <!-- Bootstrap CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-
     <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -26,6 +39,7 @@
         body {
             font-family: 'Roboto', sans-serif;
             background-color: #f8f9fa;
+            padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
         }
 
         .editor-container {
@@ -63,12 +77,17 @@
             background-color: #f0f0f0;
             border-color: #ddd;
         }
-        .toolbar-btn:disabled {
-            opacity: 0.4;
-            cursor: not-allowed;
-        }
+        .toolbar-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
-        /* Панель поиска — встроенная, не перекрывает редактор */
+        .install-btn {
+            background-color: #007bff;
+            color: #fff !important;
+            border-color: #007bff;
+            font-size: 13px;
+            padding: 5px 12px;
+        }
+        .install-btn:hover { background-color: #0069d9; }
+
         .search-panel {
             background-color: #f1f3f5;
             border-bottom: 1px solid #dee2e6;
@@ -79,16 +98,9 @@
             align-items: center;
             z-index: 1;
         }
-        .search-panel .form-control {
-            max-width: 220px;
-        }
-        .search-panel .match-info {
-            font-size: 13px;
-            color: #495057;
-            margin-left: auto;
-        }
+        .search-panel .form-control { max-width: 220px; }
+        .search-panel .match-info { font-size: 13px; color: #495057; margin-left: auto; }
 
-        /* Обёртка редактора для placeholder */
         .editor-wrapper {
             position: relative;
             flex: 1;
@@ -108,14 +120,11 @@
             white-space: pre-wrap;
             word-wrap: break-word;
         }
-        .editor-area:focus {
-            box-shadow: inset 0 0 0 2px #007bff;
-        }
+        .editor-area:focus { box-shadow: inset 0 0 0 2px #007bff; }
+
         .editor-placeholder {
             position: absolute;
-            top: 20px;
-            left: 20px;
-            right: 20px;
+            top: 20px; left: 20px; right: 20px;
             color: #adb5bd;
             pointer-events: none;
             font-size: 16px;
@@ -134,15 +143,30 @@
         }
         .status-item { margin-right: 20px; }
         .status-item:last-child { margin-right: 0; }
+
+        /* Индикатор offline */
+        .offline-badge {
+            background-color: #dc3545;
+            color: #fff;
+            padding: 2px 8px;
+            border-radius: 3px;
+            font-size: 12px;
+            margin-left: 10px;
+        }
+
+        @media (max-width: 576px) {
+            .toolbar-group { margin-right: 8px; }
+            .toolbar-btn { padding: 5px 8px; }
+            .search-panel .form-control { max-width: 140px; }
+        }
     </style>
 </head>
 <body>
     <div x-data="textEditor()" class="editor-container">
 
-        <!-- Верхняя панель инструментов -->
+        <!-- Верхняя панель -->
         <div class="toolbar">
             <div class="d-flex align-items-center flex-wrap">
-                <!-- Буфер обмена -->
                 <div class="toolbar-group">
                     <button class="toolbar-btn" title="Вырезать" aria-label="Вырезать" @click="cutText">
                         <i class="fas fa-cut"></i>
@@ -155,7 +179,6 @@
                     </button>
                 </div>
 
-                <!-- Отмена/Повтор -->
                 <div class="toolbar-group">
                     <button class="toolbar-btn" title="Отменить (Ctrl+Z)" aria-label="Отменить"
                             :disabled="!canUndo" @click="undo">
@@ -167,7 +190,6 @@
                     </button>
                 </div>
 
-                <!-- Шрифт -->
                 <div class="toolbar-group">
                     <select class="form-select form-select-sm" style="width: 180px;"
                             aria-label="Шрифт" x-model="selectedFont">
@@ -183,17 +205,27 @@
                     </select>
                 </div>
 
-                <!-- Поиск -->
                 <div class="toolbar-group">
                     <button class="toolbar-btn" title="Найти и заменить (Ctrl+F)" aria-label="Найти и заменить"
                             @click="toggleSearchPanel">
                         <i class="fas fa-search"></i>
                     </button>
                 </div>
+
+                <!-- Кнопка установки PWA -->
+                <div class="toolbar-group ms-auto">
+                    <span class="offline-badge" x-show="!isOnline" x-cloak>
+                        <i class="fas fa-wifi"></i> Офлайн
+                    </span>
+                    <button class="toolbar-btn install-btn" x-show="canInstall" x-cloak
+                            @click="installPWA" title="Установить приложение">
+                        <i class="fas fa-download me-1"></i> Установить
+                    </button>
+                </div>
             </div>
         </div>
 
-        <!-- Встроенная панель поиска и замены -->
+        <!-- Панель поиска -->
         <div class="search-panel" x-show="showSearchPanel" x-cloak>
             <input type="text" class="form-control form-control-sm"
                    placeholder="Найти" aria-label="Найти"
@@ -209,13 +241,10 @@
             <button class="btn btn-warning btn-sm" @click="replaceCurrent">Заменить</button>
             <button class="btn btn-danger btn-sm" @click="replaceAll">Заменить все</button>
             <button class="btn btn-secondary btn-sm" @click="closeSearchPanel">Закрыть</button>
-
             <span class="match-info" x-show="searchTerm">
                 <template x-if="searchMatches.length > 0">
-                    <span>
-                        Совпадение <span x-text="currentMatchIndex + 1"></span>
-                        из <span x-text="searchMatches.length"></span>
-                    </span>
+                    <span>Совпадение <span x-text="currentMatchIndex + 1"></span>
+                        из <span x-text="searchMatches.length"></span></span>
                 </template>
                 <template x-if="searchTerm && searchMatches.length === 0">
                     <span class="text-muted">Нет совпадений</span>
@@ -223,25 +252,23 @@
             </span>
         </div>
 
-        <!-- Область редактирования -->
+        <!-- Редактор -->
         <div class="editor-wrapper">
-            <div
-                class="editor-area"
-                contenteditable="true"
-                spellcheck="true"
-                x-ref="editor"
-                :style="`font-family: '${selectedFont}', sans-serif; font-size: ${selectedFontSize}px;`"
-                @input="handleInput"
-                @keydown="handleKeydown"
-                @paste="handlePaste"
-                @drop.prevent="handleDrop"
-            ></div>
+            <div class="editor-area"
+                 contenteditable="true"
+                 spellcheck="true"
+                 x-ref="editor"
+                 :style="`font-family: '${selectedFont}', sans-serif; font-size: ${selectedFontSize}px;`"
+                 @input="handleInput"
+                 @keydown="handleKeydown"
+                 @paste="handlePaste"
+                 @drop.prevent="handleDrop"></div>
             <div class="editor-placeholder" x-show="content.length === 0" x-cloak>
                 Начните вводить текст здесь...
             </div>
         </div>
 
-        <!-- Строка состояния -->
+        <!-- Статус -->
         <div class="status-bar">
             <div class="d-flex flex-wrap">
                 <div class="status-item">
@@ -257,6 +284,67 @@
             </div>
         </div>
     </div>
+
+    <!-- ===== PWA: манифест, иконка, регистрация SW ===== -->
+    <script>
+        (function setupPWA() {
+            // --- SVG-иконка (используется и в манифесте, и в favicon, и в apple-touch-icon) ---
+            const svg = `
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+                    <rect width="512" height="512" rx="96" fill="#343a40"/>
+                    <path d="M96 120h320v44H96zM96 200h320v44H96zM96 280h220v44H96zM96 360h260v44H96z"
+                          fill="#ffffff"/>
+                    <circle cx="400" cy="400" r="70" fill="#007bff"/>
+                    <path d="M370 400l20 20 40-40" stroke="#fff" stroke-width="14"
+                          fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>`;
+            const iconDataUri = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svg)));
+
+            // --- Ставим иконки в head ---
+            document.getElementById('favicon').href = iconDataUri;
+            document.getElementById('apple-touch-icon').href = iconDataUri;
+
+            // --- Генерируем манифест как Blob (Chrome/Edge поддерживают blob: манифест) ---
+            const manifest = {
+                name: 'Текстовый редактор для социальных сетей',
+                short_name: 'Редактор',
+                description: 'Плаин-текстовый редактор с поиском, заменой и статистикой',
+                lang: 'ru',
+                start_url: './',
+                scope: './',
+                display: 'standalone',
+                display_override: ['window-controls-overlay', 'standalone', 'minimal-ui'],
+                orientation: 'any',
+                background_color: '#f8f9fa',
+                theme_color: '#343a40',
+                categories: ['productivity', 'utilities'],
+                icons: [
+                    { src: iconDataUri, sizes: '192x192', type: 'image/svg+xml', purpose: 'any' },
+                    { src: iconDataUri, sizes: '512x512', type: 'image/svg+xml', purpose: 'any' },
+                    { src: iconDataUri, sizes: '512x512', type: 'image/svg+xml', purpose: 'maskable' }
+                ],
+                shortcuts: [
+                    {
+                        name: 'Новый документ',
+                        short_name: 'Новый',
+                        url: './?action=new',
+                        icons: [{ src: iconDataUri, sizes: '192x192', type: 'image/svg+xml' }]
+                    }
+                ]
+            };
+            const manifestBlob = new Blob([JSON.stringify(manifest)], { type: 'application/manifest+json' });
+            document.getElementById('pwa-manifest').href = URL.createObjectURL(manifestBlob);
+
+            // --- Регистрация Service Worker ---
+            if ('serviceWorker' in navigator) {
+                window.addEventListener('load', () => {
+                    navigator.serviceWorker.register('./sw.js', { scope: './' })
+                        .then(reg => console.log('[PWA] SW зарегистрирован:', reg.scope))
+                        .catch(err => console.warn('[PWA] Ошибка SW:', err));
+                });
+            }
+        })();
+    </script>
 
     <script>
         document.addEventListener('alpine:init', () => {
@@ -284,7 +372,14 @@
                 autosaveInterval: null,
                 beforeUnloadHandler: null,
 
-                // Справочники
+                // PWA
+                canInstall: false,
+                deferredPrompt: null,
+                isOnline: navigator.onLine,
+                onlineHandler: null,
+                offlineHandler: null,
+                installHandler: null,
+
                 availableFonts: ['Roboto', 'Open Sans', 'Lato', 'Montserrat', 'Source Sans Pro'],
                 fontSizes: [12, 14, 16, 18, 20, 24, 28, 32],
 
@@ -299,35 +394,67 @@
 
                 // ----- Жизненный цикл -----
                 init() {
-                    // ВАЖНО: сначала читаем localStorage, потом пишем в историю
+                    // Загружаем контент
                     const saved = localStorage.getItem('editorContent');
                     this.content = saved !== null ? saved : '';
                     this.$refs.editor.textContent = this.content;
 
+                    // Обработка ярлыка "Новый документ" из манифеста
+                    if (new URLSearchParams(location.search).get('action') === 'new') {
+                        this.content = '';
+                        this.$refs.editor.textContent = '';
+                        history.replaceState(null, '', location.pathname);
+                    }
+
                     this.history = [this.content];
                     this.historyIndex = 0;
-
                     this.updateStats();
 
-                    // Периодическое автосохранение (на случай, если вкладку не закрыли)
+                    // Автосохранение
                     this.autosaveInterval = setInterval(() => this.saveContent(), 30000);
-
-                    // Сохранение перед закрытием вкладки
                     this.beforeUnloadHandler = () => this.saveContent();
                     window.addEventListener('beforeunload', this.beforeUnloadHandler);
+
+                    // Онлайн/офлайн
+                    this.onlineHandler = () => this.isOnline = true;
+                    this.offlineHandler = () => this.isOnline = false;
+                    window.addEventListener('online', this.onlineHandler);
+                    window.addEventListener('offline', this.offlineHandler);
+
+                    // Установка PWA
+                    this.installHandler = (e) => {
+                        e.preventDefault();
+                        this.deferredPrompt = e;
+                        this.canInstall = true;
+                    };
+                    window.addEventListener('beforeinstallprompt', this.installHandler);
+                    window.addEventListener('appinstalled', () => {
+                        this.canInstall = false;
+                        this.deferredPrompt = null;
+                    });
                 },
 
                 destroy() {
                     if (this.autosaveInterval) clearInterval(this.autosaveInterval);
                     if (this.historyTimer) clearTimeout(this.historyTimer);
                     if (this.saveTimer) clearTimeout(this.saveTimer);
-                    if (this.beforeUnloadHandler) {
-                        window.removeEventListener('beforeunload', this.beforeUnloadHandler);
-                    }
+                    if (this.beforeUnloadHandler) window.removeEventListener('beforeunload', this.beforeUnloadHandler);
+                    if (this.onlineHandler) window.removeEventListener('online', this.onlineHandler);
+                    if (this.offlineHandler) window.removeEventListener('offline', this.offlineHandler);
+                    if (this.installHandler) window.removeEventListener('beforeinstallprompt', this.installHandler);
                     this.saveContent();
                 },
 
-                // ----- Обработка ввода -----
+                async installPWA() {
+                    if (!this.deferredPrompt) return;
+                    this.deferredPrompt.prompt();
+                    const { outcome } = await this.deferredPrompt.userChoice;
+                    console.log('[PWA] Install outcome:', outcome);
+                    this.deferredPrompt = null;
+                    this.canInstall = false;
+                },
+
+                // ----- Ввод -----
                 handleInput() {
                     this.updateStats();
                     this.scheduleHistorySave();
@@ -373,17 +500,11 @@
                     const currentText = this.$refs.editor.textContent || '';
                     if (this.history[this.historyIndex] === currentText) return;
 
-                    // Обрезаем "будущее", если мы в середине истории
                     if (this.historyIndex < this.history.length - 1) {
                         this.history = this.history.slice(0, this.historyIndex + 1);
                     }
-
                     this.history.push(currentText);
-
-                    // Ограничиваем глубину
-                    if (this.history.length > 100) {
-                        this.history.shift();
-                    }
+                    if (this.history.length > 100) this.history.shift();
                     this.historyIndex = this.history.length - 1;
                 },
 
@@ -425,11 +546,9 @@
                 handleKeydown(e) {
                     const mod = e.ctrlKey || e.metaKey;
 
-                    // Отмена/Повтор
                     if (mod && (e.key === 'z' || e.key === 'Z' || e.key === 'я' || e.key === 'Я')) {
                         e.preventDefault();
-                        if (e.shiftKey) this.redo();
-                        else this.undo();
+                        if (e.shiftKey) this.redo(); else this.undo();
                         return;
                     }
                     if (mod && (e.key === 'y' || e.key === 'Y' || e.key === 'н' || e.key === 'Н')) {
@@ -437,26 +556,22 @@
                         this.redo();
                         return;
                     }
-                    // Поиск
                     if (mod && (e.key === 'f' || e.key === 'F' || e.key === 'а' || e.key === 'А')) {
                         e.preventDefault();
                         this.showSearchPanel = true;
                         return;
                     }
-                    // Escape — закрыть панель поиска
                     if (e.key === 'Escape' && this.showSearchPanel) {
                         this.closeSearchPanel();
                         return;
                     }
-
-                    // Enter — вставляем \n как текст (plain-text редактор)
                     if (e.key === 'Enter') {
                         e.preventDefault();
                         this.insertTextAtCursor('\n');
                     }
                 },
 
-                // ----- Вставка/удаление -----
+                // ----- Вставка -----
                 insertTextAtCursor(text) {
                     const editor = this.$refs.editor;
                     editor.focus();
@@ -464,26 +579,21 @@
                     const selection = window.getSelection();
                     if (selection.rangeCount > 0) {
                         const range = selection.getRangeAt(0);
-
-                        // Если курсор вне редактора — вставляем в конец
                         if (!editor.contains(range.commonAncestorContainer)) {
                             range.selectNodeContents(editor);
                             range.collapse(false);
                         }
-
                         range.deleteContents();
                         const textNode = document.createTextNode(text);
                         range.insertNode(textNode);
                         range.setStartAfter(textNode);
                         range.collapse(true);
-
                         selection.removeAllRanges();
                         selection.addRange(range);
                     } else {
                         editor.appendChild(document.createTextNode(text));
                     }
 
-                    // Сливаем соседние текстовые узлы в один — важно для поиска
                     editor.normalize();
 
                     this.updateStats();
@@ -493,12 +603,10 @@
 
                 handlePaste(e) {
                     e.preventDefault();
-                    const text = e.clipboardData.getData('text/plain');
-                    this.insertTextAtCursor(text);
+                    this.insertTextAtCursor(e.clipboardData.getData('text/plain'));
                 },
 
                 handleDrop(e) {
-                    // Позволяем только plain-text drop
                     const text = e.dataTransfer.getData('text/plain');
                     if (text) this.insertTextAtCursor(text);
                 },
@@ -507,31 +615,21 @@
                     const selection = window.getSelection();
                     const selected = selection.toString();
                     if (!selected) return;
+                    try { await navigator.clipboard.writeText(selected); }
+                    catch (err) { console.error('Cut error:', err); return; }
 
-                    try {
-                        await navigator.clipboard.writeText(selected);
-                    } catch (err) {
-                        console.error('Cut error:', err);
-                        return;
-                    }
-
-                    const range = selection.getRangeAt(0);
-                    range.deleteContents();
+                    selection.getRangeAt(0).deleteContents();
                     this.$refs.editor.normalize();
-
                     this.updateStats();
                     this.scheduleHistorySave();
                     this.scheduleSaveContent();
                 },
 
                 async copyText() {
-                    const selected = window.getSelection().toString();
-                    if (!selected) return;
-                    try {
-                        await navigator.clipboard.writeText(selected);
-                    } catch (err) {
-                        console.error('Copy error:', err);
-                    }
+                    const s = window.getSelection().toString();
+                    if (!s) return;
+                    try { await navigator.clipboard.writeText(s); }
+                    catch (err) { console.error('Copy error:', err); }
                 },
 
                 async pasteText() {
@@ -539,12 +637,10 @@
                     try {
                         const text = await navigator.clipboard.readText();
                         this.insertTextAtCursor(text);
-                    } catch (err) {
-                        console.error('Paste error:', err);
-                    }
+                    } catch (err) { console.error('Paste error:', err); }
                 },
 
-                // ----- Поиск и замена -----
+                // ----- Поиск -----
                 toggleSearchPanel() {
                     this.showSearchPanel = !this.showSearchPanel;
                     if (!this.showSearchPanel) this.clearSelection();
@@ -562,22 +658,16 @@
                     if (sel) sel.removeAllRanges();
                 },
 
-                // Плоский текст редактора
                 buildTextMap() {
-                    const editor = this.$refs.editor;
-                    const walker = document.createTreeWalker(editor, NodeFilter.SHOW_TEXT, null);
-                    let text = '';
-                    let node;
+                    const walker = document.createTreeWalker(this.$refs.editor, NodeFilter.SHOW_TEXT, null);
+                    let text = '', node;
                     while ((node = walker.nextNode())) text += node.textContent;
                     return text;
                 },
 
-                // Позиция (node, offset) -> плоское смещение
                 getOffsetFromNode(node, offset) {
-                    const editor = this.$refs.editor;
-                    const walker = document.createTreeWalker(editor, NodeFilter.SHOW_TEXT, null);
-                    let pos = 0;
-                    let n;
+                    const walker = document.createTreeWalker(this.$refs.editor, NodeFilter.SHOW_TEXT, null);
+                    let pos = 0, n;
                     while ((n = walker.nextNode())) {
                         if (n === node) return pos + offset;
                         pos += n.textContent.length;
@@ -585,19 +675,12 @@
                     return -1;
                 },
 
-                // Плоские смещения -> Range
                 rangeFromOffsets(start, end) {
-                    const editor = this.$refs.editor;
-                    const walker = document.createTreeWalker(editor, NodeFilter.SHOW_TEXT, null);
-
-                    let pos = 0;
-                    let startNode = null, startOffset = 0;
-                    let endNode = null, endOffset = 0;
-                    let n;
+                    const walker = document.createTreeWalker(this.$refs.editor, NodeFilter.SHOW_TEXT, null);
+                    let pos = 0, startNode = null, startOffset = 0, endNode = null, endOffset = 0, n;
 
                     while ((n = walker.nextNode())) {
                         const len = n.textContent.length;
-
                         if (!startNode && pos + len >= start) {
                             startNode = n;
                             startOffset = start - pos;
@@ -609,16 +692,13 @@
                         }
                         pos += len;
                     }
-
                     if (!startNode || !endNode) return null;
 
                     const range = document.createRange();
                     try {
                         range.setStart(startNode, startOffset);
                         range.setEnd(endNode, endOffset);
-                    } catch (e) {
-                        return null;
-                    }
+                    } catch { return null; }
                     return range;
                 },
 
@@ -630,28 +710,21 @@
                     const flags = this.caseSensitive ? 'g' : 'gi';
                     const regex = new RegExp(this.escapeRegex(this.searchTerm), flags);
 
-                    let match;
-                    while ((match = regex.exec(text)) !== null) {
+                    let m;
+                    while ((m = regex.exec(text)) !== null) {
                         this.searchMatches.push({
-                            start: match.index,
-                            end: match.index + match[0].length
+                            start: m.index,
+                            end: m.index + m[0].length
                         });
-                        // Защита от нулевых совпадений
-                        if (match[0].length === 0) regex.lastIndex++;
+                        if (m[0].length === 0) regex.lastIndex++;
                     }
                 },
 
                 findNext() {
                     if (!this.searchTerm) return;
-
                     this.recalculateMatches();
+                    if (this.searchMatches.length === 0) { this.currentMatchIndex = -1; return; }
 
-                    if (this.searchMatches.length === 0) {
-                        this.currentMatchIndex = -1;
-                        return;
-                    }
-
-                    // Смещение курсора — ищем первое совпадение после него
                     let cursorOffset = 0;
                     const sel = window.getSelection();
                     if (sel && sel.rangeCount > 0) {
@@ -662,12 +735,9 @@
 
                     let found = -1;
                     for (let i = 0; i < this.searchMatches.length; i++) {
-                        if (this.searchMatches[i].start >= cursorOffset) {
-                            found = i;
-                            break;
-                        }
+                        if (this.searchMatches[i].start >= cursorOffset) { found = i; break; }
                     }
-                    if (found === -1) found = 0; // зацикливаем
+                    if (found === -1) found = 0;
 
                     this.currentMatchIndex = found;
                     this.highlightCurrent();
@@ -675,7 +745,6 @@
 
                 highlightCurrent() {
                     if (this.currentMatchIndex < 0 || this.searchMatches.length === 0) return;
-
                     const match = this.searchMatches[this.currentMatchIndex];
                     const range = this.rangeFromOffsets(match.start, match.end);
                     if (!range) return;
@@ -684,7 +753,6 @@
                     selection.removeAllRanges();
                     selection.addRange(range);
 
-                    // Подскроллить к выделению
                     const editor = this.$refs.editor;
                     const rect = range.getBoundingClientRect();
                     const editorRect = editor.getBoundingClientRect();
@@ -695,7 +763,6 @@
 
                 replaceCurrent() {
                     if (this.currentMatchIndex < 0 || this.searchMatches.length === 0) return;
-
                     const match = this.searchMatches[this.currentMatchIndex];
                     const range = this.rangeFromOffsets(match.start, match.end);
                     if (!range) return;
@@ -703,38 +770,27 @@
                     range.deleteContents();
                     const textNode = document.createTextNode(this.replaceTerm);
                     range.insertNode(textNode);
-
-                    // Курсор — после вставленного текста
                     range.setStartAfter(textNode);
                     range.collapse(true);
+
                     const selection = window.getSelection();
                     selection.removeAllRanges();
                     selection.addRange(range);
 
                     this.$refs.editor.normalize();
-
                     this.updateStats();
                     this.scheduleHistorySave();
                     this.scheduleSaveContent();
 
-                    // Пересчитываем совпадения в новом тексте
                     this.recalculateMatches();
+                    if (this.searchMatches.length === 0) { this.currentMatchIndex = -1; return; }
 
-                    if (this.searchMatches.length === 0) {
-                        this.currentMatchIndex = -1;
-                        return;
-                    }
-
-                    // Ищем первое совпадение после только что вставленного фрагмента
                     const afterReplace = match.start + this.replaceTerm.length;
                     let found = -1;
                     for (let i = 0; i < this.searchMatches.length; i++) {
-                        if (this.searchMatches[i].start >= afterReplace) {
-                            found = i;
-                            break;
-                        }
+                        if (this.searchMatches[i].start >= afterReplace) { found = i; break; }
                     }
-                    if (found === -1) found = 0; // зацикливаем
+                    if (found === -1) found = 0;
 
                     this.currentMatchIndex = found;
                     this.highlightCurrent();
@@ -742,16 +798,13 @@
 
                 replaceAll() {
                     if (!this.searchTerm) return;
-
                     const editor = this.$refs.editor;
                     const text = editor.textContent || '';
                     const regex = new RegExp(
                         this.escapeRegex(this.searchTerm),
                         this.caseSensitive ? 'g' : 'gi'
                     );
-                    const newText = text.replace(regex, this.replaceTerm);
-
-                    editor.textContent = newText;
+                    editor.textContent = text.replace(regex, this.replaceTerm);
 
                     this.updateStats();
                     this.scheduleHistorySave();
