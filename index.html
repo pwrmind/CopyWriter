@@ -4,50 +4,51 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Текстовый редактор для социальных сетей</title>
-    
-    <!-- Подключение Bootstrap CSS -->
+
+    <!-- Bootstrap CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    
-    <!-- Подключение Font Awesome -->
+
+    <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    
-    <!-- Подключение Google Fonts -->
+
+    <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Open+Sans:wght@300;400;600;700&family=Lato:wght@300;400;700&family=Montserrat:wght@300;400;500;600&family=Source+Sans+Pro:wght@300;400;600;700&display=swap" rel="stylesheet">
-    
-    <!-- Подключение Alpine.js -->
+
+    <!-- Alpine.js -->
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
-    
+
     <style>
+        [x-cloak] { display: none !important; }
+
+        html, body { height: 100%; }
         body {
             font-family: 'Roboto', sans-serif;
             background-color: #f8f9fa;
         }
-        
+
         .editor-container {
             height: 100vh;
             display: flex;
             flex-direction: column;
         }
-        
+
         .toolbar {
             background-color: #fff;
             border-bottom: 1px solid #dee2e6;
             padding: 10px 15px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            z-index: 2;
         }
-        
+
         .toolbar-group {
             display: flex;
             align-items: center;
-            margin-right: 20px;
+            margin-right: 16px;
         }
-        
-        .toolbar-group:last-child {
-            margin-right: 0;
-        }
-        
+        .toolbar-group:last-child { margin-right: 0; }
+
         .toolbar-btn {
             background: none;
             border: 1px solid transparent;
@@ -56,31 +57,71 @@
             margin: 0 2px;
             cursor: pointer;
             transition: all 0.2s;
+            color: #333;
         }
-        
-        .toolbar-btn:hover {
+        .toolbar-btn:hover:not(:disabled) {
             background-color: #f0f0f0;
             border-color: #ddd;
         }
-        
+        .toolbar-btn:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        /* Панель поиска — встроенная, не перекрывает редактор */
+        .search-panel {
+            background-color: #f1f3f5;
+            border-bottom: 1px solid #dee2e6;
+            padding: 8px 15px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            align-items: center;
+            z-index: 1;
+        }
+        .search-panel .form-control {
+            max-width: 220px;
+        }
+        .search-panel .match-info {
+            font-size: 13px;
+            color: #495057;
+            margin-left: auto;
+        }
+
+        /* Обёртка редактора для placeholder */
+        .editor-wrapper {
+            position: relative;
+            flex: 1;
+            display: flex;
+            overflow: hidden;
+            background-color: #fff;
+        }
         .editor-area {
             flex: 1;
             padding: 20px;
             overflow: auto;
-            background-color: #fff;
+            background-color: transparent;
             border: none;
             outline: none;
-            resize: none;
             font-size: 16px;
             line-height: 1.5;
             white-space: pre-wrap;
             word-wrap: break-word;
         }
-        
         .editor-area:focus {
             box-shadow: inset 0 0 0 2px #007bff;
         }
-        
+        .editor-placeholder {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            right: 20px;
+            color: #adb5bd;
+            pointer-events: none;
+            font-size: 16px;
+            line-height: 1.5;
+        }
+
         .status-bar {
             background-color: #343a40;
             color: #fff;
@@ -88,213 +129,165 @@
             font-size: 14px;
             display: flex;
             justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 8px;
         }
-        
-        .status-item {
-            margin-right: 20px;
-        }
-        
-        .status-item:last-child {
-            margin-right: 0;
-        }
-        
-        .modal-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background-color: rgba(0, 0, 0, 0.5);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 1000;
-        }
-        
-        .search-modal {
-            background-color: #fff;
-            border-radius: 8px;
-            padding: 20px;
-            width: 500px;
-            max-width: 90%;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-        }
-        
-        .font-option {
-            padding: 8px 12px;
-            cursor: pointer;
-            transition: background-color 0.2s;
-        }
-        
-        .font-option:hover {
-            background-color: #f8f9fa;
-        }
-        
-        .highlight {
-            background-color: yellow;
-        }
-        
-        .current-highlight {
-            background-color: orange;
-        }
-        
-        /* Для обработки Enter и новых строк */
-        .editor-area[contenteditable="true"] {
-            -webkit-user-modify: read-write-plaintext-only;
-        }
+        .status-item { margin-right: 20px; }
+        .status-item:last-child { margin-right: 0; }
     </style>
 </head>
 <body>
     <div x-data="textEditor()" class="editor-container">
+
         <!-- Верхняя панель инструментов -->
         <div class="toolbar">
-            <div class="d-flex align-items-center">
-                <!-- Группа "Буфер обмена" -->
+            <div class="d-flex align-items-center flex-wrap">
+                <!-- Буфер обмена -->
                 <div class="toolbar-group">
-                    <button class="toolbar-btn" title="Вырезать" @click="cutText">
+                    <button class="toolbar-btn" title="Вырезать" aria-label="Вырезать" @click="cutText">
                         <i class="fas fa-cut"></i>
                     </button>
-                    <button class="toolbar-btn" title="Копировать" @click="copyText">
+                    <button class="toolbar-btn" title="Копировать" aria-label="Копировать" @click="copyText">
                         <i class="far fa-copy"></i>
                     </button>
-                    <button class="toolbar-btn" title="Вставить" @click="pasteText">
+                    <button class="toolbar-btn" title="Вставить" aria-label="Вставить" @click="pasteText">
                         <i class="far fa-clipboard"></i>
                     </button>
                 </div>
-                
-                <!-- Группа "Отмена/Повтор" -->
+
+                <!-- Отмена/Повтор -->
                 <div class="toolbar-group">
-                    <button class="toolbar-btn" title="Отменить" :disabled="!canUndo" @click="undo">
+                    <button class="toolbar-btn" title="Отменить (Ctrl+Z)" aria-label="Отменить"
+                            :disabled="!canUndo" @click="undo">
                         <i class="fas fa-undo"></i>
                     </button>
-                    <button class="toolbar-btn" title="Повторить" :disabled="!canRedo" @click="redo">
+                    <button class="toolbar-btn" title="Повторить (Ctrl+Y)" aria-label="Повторить"
+                            :disabled="!canRedo" @click="redo">
                         <i class="fas fa-redo"></i>
                     </button>
                 </div>
-                
-                <!-- Группа "Шрифт" -->
+
+                <!-- Шрифт -->
                 <div class="toolbar-group">
-                    <select class="form-select form-select-sm" style="width: 180px;" x-model="selectedFont" @change="applyFont">
+                    <select class="form-select form-select-sm" style="width: 180px;"
+                            aria-label="Шрифт" x-model="selectedFont">
                         <template x-for="font in availableFonts" :key="font">
-                            <option :value="font" :selected="selectedFont === font" x-text="font"></option>
+                            <option :value="font" x-text="font"></option>
                         </template>
                     </select>
-                    
-                    <select class="form-select form-select-sm ms-2" style="width: 80px;" x-model="selectedFontSize" @change="applyFontSize">
+                    <select class="form-select form-select-sm ms-2" style="width: 80px;"
+                            aria-label="Размер шрифта" x-model.number="selectedFontSize">
                         <template x-for="size in fontSizes" :key="size">
-                            <option :value="size" :selected="selectedFontSize === size" x-text="size"></option>
+                            <option :value="size" x-text="size"></option>
                         </template>
                     </select>
                 </div>
-                
-                <!-- Группа "Поиск" -->
+
+                <!-- Поиск -->
                 <div class="toolbar-group">
-                    <button class="toolbar-btn" title="Найти и заменить" @click="showSearchModal = true">
+                    <button class="toolbar-btn" title="Найти и заменить (Ctrl+F)" aria-label="Найти и заменить"
+                            @click="toggleSearchPanel">
                         <i class="fas fa-search"></i>
                     </button>
                 </div>
             </div>
         </div>
-        
-        <!-- Центральная область редактирования -->
-        <div 
-            class="editor-area" 
-            contenteditable="true" 
-            x-ref="editor"
-            :style="`font-family: '${selectedFont}', sans-serif; font-size: ${selectedFontSize}px;`"
-            @input="handleInput"
-            @keydown="handleKeydown"
-            @paste="handlePaste"
-        ></div>
-        
-        <!-- Нижняя строка состояния -->
+
+        <!-- Встроенная панель поиска и замены -->
+        <div class="search-panel" x-show="showSearchPanel" x-cloak>
+            <input type="text" class="form-control form-control-sm"
+                   placeholder="Найти" aria-label="Найти"
+                   x-model="searchTerm" @keydown.enter.prevent="findNext">
+            <input type="text" class="form-control form-control-sm"
+                   placeholder="Заменить на" aria-label="Заменить на"
+                   x-model="replaceTerm">
+            <div class="form-check mb-0">
+                <input class="form-check-input" type="checkbox" id="caseSensitive" x-model="caseSensitive">
+                <label class="form-check-label small" for="caseSensitive">С учётом регистра</label>
+            </div>
+            <button class="btn btn-primary btn-sm" @click="findNext">Найти</button>
+            <button class="btn btn-warning btn-sm" @click="replaceCurrent">Заменить</button>
+            <button class="btn btn-danger btn-sm" @click="replaceAll">Заменить все</button>
+            <button class="btn btn-secondary btn-sm" @click="closeSearchPanel">Закрыть</button>
+
+            <span class="match-info" x-show="searchTerm">
+                <template x-if="searchMatches.length > 0">
+                    <span>
+                        Совпадение <span x-text="currentMatchIndex + 1"></span>
+                        из <span x-text="searchMatches.length"></span>
+                    </span>
+                </template>
+                <template x-if="searchTerm && searchMatches.length === 0">
+                    <span class="text-muted">Нет совпадений</span>
+                </template>
+            </span>
+        </div>
+
+        <!-- Область редактирования -->
+        <div class="editor-wrapper">
+            <div
+                class="editor-area"
+                contenteditable="true"
+                spellcheck="true"
+                x-ref="editor"
+                :style="`font-family: '${selectedFont}', sans-serif; font-size: ${selectedFontSize}px;`"
+                @input="handleInput"
+                @keydown="handleKeydown"
+                @paste="handlePaste"
+                @drop.prevent="handleDrop"
+            ></div>
+            <div class="editor-placeholder" x-show="content.length === 0" x-cloak>
+                Начните вводить текст здесь...
+            </div>
+        </div>
+
+        <!-- Строка состояния -->
         <div class="status-bar">
-            <div class="d-flex">
+            <div class="d-flex flex-wrap">
                 <div class="status-item">
-                    Символов: <span x-text="stats.charactersWithSpaces"></span> (<span x-text="stats.charactersWithoutSpaces"></span> без пробелов)
+                    Символов: <span x-text="stats.charactersWithSpaces"></span>
+                    (<span x-text="stats.charactersWithoutSpaces"></span> без пробелов)
                 </div>
-                <div class="status-item">
-                    Слов: <span x-text="stats.words"></span>
-                </div>
-                <div class="status-item">
-                    Предложений: <span x-text="stats.sentences"></span>
-                </div>
-                <div class="status-item">
-                    Абзацев: <span x-text="stats.paragraphs"></span>
-                </div>
+                <div class="status-item">Слов: <span x-text="stats.words"></span></div>
+                <div class="status-item">Предложений: <span x-text="stats.sentences"></span></div>
+                <div class="status-item">Абзацев: <span x-text="stats.paragraphs"></span></div>
             </div>
             <div class="status-item">
                 Время чтения: ~<span x-text="stats.readingTime"></span> мин.
             </div>
         </div>
-        
-        <!-- Модальное окно поиска и замены -->
-        <template x-if="showSearchModal">
-            <div class="modal-overlay" @click.self="showSearchModal = false">
-                <div class="search-modal">
-                    <h5 class="mb-3">Найти и заменить</h5>
-                    
-                    <div class="mb-3">
-                        <label class="form-label">Найти:</label>
-                        <input type="text" class="form-control" x-model="searchTerm">
-                    </div>
-                    
-                    <div class="mb-3">
-                        <label class="form-label">Заменить на:</label>
-                        <input type="text" class="form-control" x-model="replaceTerm">
-                    </div>
-                    
-                    <div class="form-check mb-3">
-                        <input class="form-check-input" type="checkbox" id="caseSensitive" x-model="caseSensitive">
-                        <label class="form-check-label" for="caseSensitive">
-                            С учётом регистра
-                        </label>
-                    </div>
-                    
-                    <div class="d-flex justify-content-between">
-                        <div>
-                            <button class="btn btn-primary btn-sm" @click="findNext">Найти следующее</button>
-                            <button class="btn btn-warning btn-sm ms-2" @click="replaceCurrent">Заменить</button>
-                            <button class="btn btn-danger btn-sm ms-2" @click="replaceAll">Заменить все</button>
-                        </div>
-                        <button class="btn btn-secondary btn-sm" @click="closeSearchModal">Закрыть</button>
-                    </div>
-                </div>
-            </div>
-        </template>
     </div>
 
     <script>
         document.addEventListener('alpine:init', () => {
             Alpine.data('textEditor', () => ({
-                // Состояние приложения
-                content: 'Начните вводить текст здесь...',
+                // ----- Состояние -----
+                content: '',
                 selectedFont: 'Roboto',
                 selectedFontSize: 16,
-                showSearchModal: false,
+
+                // Поиск
+                showSearchPanel: false,
                 searchTerm: '',
                 replaceTerm: '',
                 caseSensitive: false,
                 searchMatches: [],
                 currentMatchIndex: -1,
-                
-                // История действий
-                history: [],
-                historyIndex: -1,
-                
-                // Доступные шрифты
-                availableFonts: [
-                    'Roboto',
-                    'Open Sans',
-                    'Lato',
-                    'Montserrat',
-                    'Source Sans Pro'
-                ],
-                
-                // Доступные размеры шрифтов
+
+                // История
+                history: [''],
+                historyIndex: 0,
+                historyTimer: null,
+
+                // Сохранение
+                saveTimer: null,
+                autosaveInterval: null,
+                beforeUnloadHandler: null,
+
+                // Справочники
+                availableFonts: ['Roboto', 'Open Sans', 'Lato', 'Montserrat', 'Source Sans Pro'],
                 fontSizes: [12, 14, 16, 18, 20, 24, 28, 32],
-                
-                // Статистика
+
                 stats: {
                     charactersWithSpaces: 0,
                     charactersWithoutSpaces: 0,
@@ -303,384 +296,472 @@
                     paragraphs: 0,
                     readingTime: 0
                 },
-                
-                // Инициализация
+
+                // ----- Жизненный цикл -----
                 init() {
-                    // Устанавливаем начальный текст
+                    // ВАЖНО: сначала читаем localStorage, потом пишем в историю
+                    const saved = localStorage.getItem('editorContent');
+                    this.content = saved !== null ? saved : '';
                     this.$refs.editor.textContent = this.content;
+
+                    this.history = [this.content];
+                    this.historyIndex = 0;
+
                     this.updateStats();
-                    this.saveToHistory();
-                    
-                    // Загрузка сохраненного контента из localStorage
-                    const savedContent = localStorage.getItem('editorContent');
-                    if (savedContent) {
-                        this.content = savedContent;
-                        this.$refs.editor.textContent = savedContent;
-                        this.updateStats();
-                    }
-                    
-                    // Автосохранение каждые 30 секунд
-                    setInterval(() => {
-                        this.saveContent();
-                    }, 30000);
+
+                    // Периодическое автосохранение (на случай, если вкладку не закрыли)
+                    this.autosaveInterval = setInterval(() => this.saveContent(), 30000);
+
+                    // Сохранение перед закрытием вкладки
+                    this.beforeUnloadHandler = () => this.saveContent();
+                    window.addEventListener('beforeunload', this.beforeUnloadHandler);
                 },
-                
-                // Обработка ввода
+
+                destroy() {
+                    if (this.autosaveInterval) clearInterval(this.autosaveInterval);
+                    if (this.historyTimer) clearTimeout(this.historyTimer);
+                    if (this.saveTimer) clearTimeout(this.saveTimer);
+                    if (this.beforeUnloadHandler) {
+                        window.removeEventListener('beforeunload', this.beforeUnloadHandler);
+                    }
+                    this.saveContent();
+                },
+
+                // ----- Обработка ввода -----
                 handleInput() {
                     this.updateStats();
-                    this.saveToHistory();
+                    this.scheduleHistorySave();
+                    this.scheduleSaveContent();
                 },
-                
-                // Обновление статистики
+
+                scheduleHistorySave() {
+                    clearTimeout(this.historyTimer);
+                    this.historyTimer = setTimeout(() => this.saveToHistory(), 400);
+                },
+
+                scheduleSaveContent() {
+                    clearTimeout(this.saveTimer);
+                    this.saveTimer = setTimeout(() => this.saveContent(), 500);
+                },
+
                 updateStats() {
                     const text = this.$refs.editor.textContent || '';
                     this.content = text;
-                    
-                    // Символы с пробелами и без
+
                     this.stats.charactersWithSpaces = text.length;
                     this.stats.charactersWithoutSpaces = text.replace(/\s/g, '').length;
-                    
-                    // Слова
-                    const words = text.trim() ? text.trim().split(/\s+/) : [];
-                    this.stats.words = words.length;
-                    
-                    // Предложения
-                    const sentences = text.split(/[.!?]+/).filter(s => s.trim().length > 0);
-                    this.stats.sentences = sentences.length;
-                    
-                    // Абзацы
-                    const paragraphs = text.split(/\n+/).filter(p => p.trim().length > 0);
-                    this.stats.paragraphs = paragraphs.length;
-                    
-                    // Время чтения (предполагаем 200 слов в минуту)
-                    this.stats.readingTime = Math.max(1, Math.ceil(this.stats.words / 200));
-                    
-                    // Сохранение контента
-                    this.saveContent();
+
+                    const trimmed = text.trim();
+                    this.stats.words = trimmed ? trimmed.split(/\s+/).length : 0;
+                    this.stats.sentences = trimmed
+                        ? text.split(/[.!?]+/).filter(s => s.trim().length > 0).length
+                        : 0;
+                    this.stats.paragraphs = trimmed
+                        ? text.split(/\n+/).filter(p => p.trim().length > 0).length
+                        : 0;
+                    this.stats.readingTime = this.stats.words === 0
+                        ? 0
+                        : Math.max(1, Math.ceil(this.stats.words / 200));
                 },
-                
-                // Сохранение контента в localStorage
+
                 saveContent() {
                     localStorage.setItem('editorContent', this.content);
                 },
-                
-                // Сохранение в историю
+
+                // ----- История -----
                 saveToHistory() {
-                    const currentText = this.$refs.editor.textContent;
-                    
-                    // Если текст не изменился, не сохраняем в историю
-                    if (this.history[this.historyIndex] === currentText) {
-                        return;
-                    }
-                    
-                    // Удаляем все действия после текущего индекса (если мы не в конце истории)
+                    const currentText = this.$refs.editor.textContent || '';
+                    if (this.history[this.historyIndex] === currentText) return;
+
+                    // Обрезаем "будущее", если мы в середине истории
                     if (this.historyIndex < this.history.length - 1) {
                         this.history = this.history.slice(0, this.historyIndex + 1);
                     }
-                    
-                    // Добавляем текущее состояние
+
                     this.history.push(currentText);
-                    
-                    // Ограничиваем глубину истории
-                    if (this.history.length > 50) {
+
+                    // Ограничиваем глубину
+                    if (this.history.length > 100) {
                         this.history.shift();
-                    } else {
-                        this.historyIndex = this.history.length - 1;
                     }
+                    this.historyIndex = this.history.length - 1;
                 },
-                
-                // Отмена действия
+
                 undo() {
                     if (this.historyIndex > 0) {
                         this.historyIndex--;
-                        const previousText = this.history[this.historyIndex];
-                        this.$refs.editor.textContent = previousText;
-                        this.content = previousText;
-                        this.updateStats();
-                        
-                        // Восстанавливаем позицию курсора в конец текста
-                        this.setCursorToEnd();
+                        this.applyHistoryState(this.history[this.historyIndex]);
                     }
                 },
-                
-                // Повтор действия
+
                 redo() {
                     if (this.historyIndex < this.history.length - 1) {
                         this.historyIndex++;
-                        const nextText = this.history[this.historyIndex];
-                        this.$refs.editor.textContent = nextText;
-                        this.content = nextText;
-                        this.updateStats();
-                        
-                        // Восстанавливаем позицию курсора в конец текста
-                        this.setCursorToEnd();
+                        this.applyHistoryState(this.history[this.historyIndex]);
                     }
                 },
-                
-                // Установка курсора в конец текста
+
+                applyHistoryState(text) {
+                    this.$refs.editor.textContent = text;
+                    this.content = text;
+                    this.updateStats();
+                    this.setCursorToEnd();
+                },
+
                 setCursorToEnd() {
                     const editor = this.$refs.editor;
                     const range = document.createRange();
                     const selection = window.getSelection();
-                    
                     range.selectNodeContents(editor);
-                    range.collapse(false); // false - в конец
-                    
+                    range.collapse(false);
                     selection.removeAllRanges();
                     selection.addRange(range);
                 },
-                
-                // Проверка возможности отмены
-                get canUndo() {
-                    return this.historyIndex > 0;
-                },
-                
-                // Проверка возможности повтора
-                get canRedo() {
-                    return this.historyIndex < this.history.length - 1;
-                },
-                
-                // Применение шрифта
-                applyFont() {
-                    this.$refs.editor.style.fontFamily = `'${this.selectedFont}', sans-serif`;
-                },
-                
-                // Применение размера шрифта
-                applyFontSize() {
-                    this.$refs.editor.style.fontSize = `${this.selectedFontSize}px`;
-                },
-                
-                // Обработка нажатия клавиш
+
+                get canUndo() { return this.historyIndex > 0; },
+                get canRedo() { return this.historyIndex < this.history.length - 1; },
+
+                // ----- Клавиатура -----
                 handleKeydown(e) {
-                    // Сохранение в историю при значимых изменениях
-                    if (e.key.length === 1 || e.key === 'Backspace' || e.key === 'Delete') {
-                        // Используем setTimeout, чтобы изменение успело произойти
-                        setTimeout(() => {
-                            this.saveToHistory();
-                        }, 0);
+                    const mod = e.ctrlKey || e.metaKey;
+
+                    // Отмена/Повтор
+                    if (mod && (e.key === 'z' || e.key === 'Z' || e.key === 'я' || e.key === 'Я')) {
+                        e.preventDefault();
+                        if (e.shiftKey) this.redo();
+                        else this.undo();
+                        return;
                     }
-                    
-                    // Обработка Enter для создания новой строки
+                    if (mod && (e.key === 'y' || e.key === 'Y' || e.key === 'н' || e.key === 'Н')) {
+                        e.preventDefault();
+                        this.redo();
+                        return;
+                    }
+                    // Поиск
+                    if (mod && (e.key === 'f' || e.key === 'F' || e.key === 'а' || e.key === 'А')) {
+                        e.preventDefault();
+                        this.showSearchPanel = true;
+                        return;
+                    }
+                    // Escape — закрыть панель поиска
+                    if (e.key === 'Escape' && this.showSearchPanel) {
+                        this.closeSearchPanel();
+                        return;
+                    }
+
+                    // Enter — вставляем \n как текст (plain-text редактор)
                     if (e.key === 'Enter') {
                         e.preventDefault();
                         this.insertTextAtCursor('\n');
                     }
                 },
-                
-                // Вставка текста в позицию курсора
+
+                // ----- Вставка/удаление -----
                 insertTextAtCursor(text) {
                     const editor = this.$refs.editor;
+                    editor.focus();
+
                     const selection = window.getSelection();
-                    
                     if (selection.rangeCount > 0) {
                         const range = selection.getRangeAt(0);
+
+                        // Если курсор вне редактора — вставляем в конец
+                        if (!editor.contains(range.commonAncestorContainer)) {
+                            range.selectNodeContents(editor);
+                            range.collapse(false);
+                        }
+
                         range.deleteContents();
-                        
-                        // Создаем текстовый узел
                         const textNode = document.createTextNode(text);
                         range.insertNode(textNode);
-                        
-                        // Перемещаем курсор после вставленного текста
                         range.setStartAfter(textNode);
                         range.collapse(true);
-                        
+
                         selection.removeAllRanges();
                         selection.addRange(range);
+                    } else {
+                        editor.appendChild(document.createTextNode(text));
                     }
-                    
+
+                    // Сливаем соседние текстовые узлы в один — важно для поиска
+                    editor.normalize();
+
                     this.updateStats();
-                    this.saveToHistory();
+                    this.scheduleHistorySave();
+                    this.scheduleSaveContent();
                 },
-                
-                // Обработка вставки текста
+
                 handlePaste(e) {
                     e.preventDefault();
-                    
-                    // Получаем текст из буфера обмена
                     const text = e.clipboardData.getData('text/plain');
-                    
-                    // Вставляем текст в текущую позицию курсора
                     this.insertTextAtCursor(text);
                 },
-                
-                // Вырезание текста
-                cutText() {
-                    const editor = this.$refs.editor;
+
+                handleDrop(e) {
+                    // Позволяем только plain-text drop
+                    const text = e.dataTransfer.getData('text/plain');
+                    if (text) this.insertTextAtCursor(text);
+                },
+
+                async cutText() {
                     const selection = window.getSelection();
-                    
-                    if (selection.toString()) {
-                        // Копируем выделенный текст в буфер обмена
-                        navigator.clipboard.writeText(selection.toString())
-                            .then(() => {
-                                // Удаляем выделенный текст
-                                const range = selection.getRangeAt(0);
-                                range.deleteContents();
-                                
-                                this.updateStats();
-                                this.saveToHistory();
-                            })
-                            .catch(err => {
-                                console.error('Ошибка при вырезании текста:', err);
-                            });
+                    const selected = selection.toString();
+                    if (!selected) return;
+
+                    try {
+                        await navigator.clipboard.writeText(selected);
+                    } catch (err) {
+                        console.error('Cut error:', err);
+                        return;
+                    }
+
+                    const range = selection.getRangeAt(0);
+                    range.deleteContents();
+                    this.$refs.editor.normalize();
+
+                    this.updateStats();
+                    this.scheduleHistorySave();
+                    this.scheduleSaveContent();
+                },
+
+                async copyText() {
+                    const selected = window.getSelection().toString();
+                    if (!selected) return;
+                    try {
+                        await navigator.clipboard.writeText(selected);
+                    } catch (err) {
+                        console.error('Copy error:', err);
                     }
                 },
-                
-                // Копирование текста
-                copyText() {
-                    const editor = this.$refs.editor;
-                    const selection = window.getSelection();
-                    
-                    if (selection.toString()) {
-                        navigator.clipboard.writeText(selection.toString())
-                            .catch(err => {
-                                console.error('Ошибка при копировании текста:', err);
-                            });
-                    }
-                },
-                
-                // Вставка текста
-                pasteText() {
-                    // Фокусируемся на редакторе
+
+                async pasteText() {
                     this.$refs.editor.focus();
-                    
-                    // Используем Clipboard API для вставки
-                    navigator.clipboard.readText()
-                        .then(text => {
-                            this.insertTextAtCursor(text);
-                        })
-                        .catch(err => {
-                            console.error('Ошибка при вставке текста:', err);
-                            // Fallback для старых браузеров
-                            document.execCommand('paste');
-                        });
+                    try {
+                        const text = await navigator.clipboard.readText();
+                        this.insertTextAtCursor(text);
+                    } catch (err) {
+                        console.error('Paste error:', err);
+                    }
                 },
-                
-                // Поиск следующего совпадения
-                findNext() {
-                    if (!this.searchTerm) return;
-                    
-                    const editor = this.$refs.editor;
-                    const text = editor.textContent || '';
-                    const searchTerm = this.caseSensitive ? this.searchTerm : this.searchTerm.toLowerCase();
-                    const content = this.caseSensitive ? text : text.toLowerCase();
-                    
-                    // Находим все совпадения
+
+                // ----- Поиск и замена -----
+                toggleSearchPanel() {
+                    this.showSearchPanel = !this.showSearchPanel;
+                    if (!this.showSearchPanel) this.clearSelection();
+                },
+
+                closeSearchPanel() {
+                    this.showSearchPanel = false;
                     this.searchMatches = [];
+                    this.currentMatchIndex = -1;
+                    this.clearSelection();
+                },
+
+                clearSelection() {
+                    const sel = window.getSelection();
+                    if (sel) sel.removeAllRanges();
+                },
+
+                // Плоский текст редактора
+                buildTextMap() {
+                    const editor = this.$refs.editor;
+                    const walker = document.createTreeWalker(editor, NodeFilter.SHOW_TEXT, null);
+                    let text = '';
+                    let node;
+                    while ((node = walker.nextNode())) text += node.textContent;
+                    return text;
+                },
+
+                // Позиция (node, offset) -> плоское смещение
+                getOffsetFromNode(node, offset) {
+                    const editor = this.$refs.editor;
+                    const walker = document.createTreeWalker(editor, NodeFilter.SHOW_TEXT, null);
+                    let pos = 0;
+                    let n;
+                    while ((n = walker.nextNode())) {
+                        if (n === node) return pos + offset;
+                        pos += n.textContent.length;
+                    }
+                    return -1;
+                },
+
+                // Плоские смещения -> Range
+                rangeFromOffsets(start, end) {
+                    const editor = this.$refs.editor;
+                    const walker = document.createTreeWalker(editor, NodeFilter.SHOW_TEXT, null);
+
+                    let pos = 0;
+                    let startNode = null, startOffset = 0;
+                    let endNode = null, endOffset = 0;
+                    let n;
+
+                    while ((n = walker.nextNode())) {
+                        const len = n.textContent.length;
+
+                        if (!startNode && pos + len >= start) {
+                            startNode = n;
+                            startOffset = start - pos;
+                        }
+                        if (!endNode && pos + len >= end) {
+                            endNode = n;
+                            endOffset = end - pos;
+                            break;
+                        }
+                        pos += len;
+                    }
+
+                    if (!startNode || !endNode) return null;
+
+                    const range = document.createRange();
+                    try {
+                        range.setStart(startNode, startOffset);
+                        range.setEnd(endNode, endOffset);
+                    } catch (e) {
+                        return null;
+                    }
+                    return range;
+                },
+
+                recalculateMatches() {
+                    this.searchMatches = [];
+                    if (!this.searchTerm) return;
+
+                    const text = this.buildTextMap();
+                    const flags = this.caseSensitive ? 'g' : 'gi';
+                    const regex = new RegExp(this.escapeRegex(this.searchTerm), flags);
+
                     let match;
-                    const regex = new RegExp(this.escapeRegex(this.searchTerm), this.caseSensitive ? 'g' : 'gi');
-                    
                     while ((match = regex.exec(text)) !== null) {
                         this.searchMatches.push({
                             start: match.index,
                             end: match.index + match[0].length
                         });
-                    }
-                    
-                    // Переходим к следующему совпадению
-                    if (this.searchMatches.length > 0) {
-                        this.currentMatchIndex = (this.currentMatchIndex + 1) % this.searchMatches.length;
-                        this.highlightCurrentMatch();
+                        // Защита от нулевых совпадений
+                        if (match[0].length === 0) regex.lastIndex++;
                     }
                 },
-                
-                // Замена текущего совпадения
-                replaceCurrent() {
-                    if (this.currentMatchIndex >= 0 && this.searchMatches.length > 0) {
-                        const match = this.searchMatches[this.currentMatchIndex];
-                        const editor = this.$refs.editor;
-                        const text = editor.textContent || '';
-                        
-                        // Заменяем текст
-                        const newText = text.substring(0, match.start) + this.replaceTerm + text.substring(match.end);
-                        editor.textContent = newText;
-                        
-                        // Обновляем статистику и историю
-                        this.updateStats();
-                        this.saveToHistory();
-                        
-                        // Убираем текущее совпадение из списка
-                        this.searchMatches.splice(this.currentMatchIndex, 1);
-                        
-                        // Переходим к следующему совпадению
-                        if (this.searchMatches.length > 0) {
-                            this.currentMatchIndex = this.currentMatchIndex % this.searchMatches.length;
-                            this.highlightCurrentMatch();
-                        } else {
-                            this.currentMatchIndex = -1;
-                        }
-                    }
-                },
-                
-                // Замена всех совпадений
-                replaceAll() {
+
+                findNext() {
                     if (!this.searchTerm) return;
-                    
-                    const editor = this.$refs.editor;
-                    const text = editor.textContent || '';
-                    const regex = new RegExp(this.escapeRegex(this.searchTerm), this.caseSensitive ? 'g' : 'gi');
-                    const newText = text.replace(regex, this.replaceTerm);
-                    
-                    editor.textContent = newText;
-                    
-                    // Обновляем статистику и историю
-                    this.updateStats();
-                    this.saveToHistory();
-                    
-                    // Сбрасываем поиск
-                    this.searchMatches = [];
-                    this.currentMatchIndex = -1;
-                },
-                
-                // Подсветка текущего совпадения
-                highlightCurrentMatch() {
-                    // Сначала убираем все подсветки
-                    this.clearHighlights();
-                    
-                    if (this.currentMatchIndex >= 0 && this.searchMatches.length > 0) {
-                        const match = this.searchMatches[this.currentMatchIndex];
-                        const editor = this.$refs.editor;
-                        
-                        // Создаем диапазон для выделения
-                        const range = document.createRange();
-                        
-                        // Находим текстовый узел и позицию
-                        const textNode = editor.firstChild; // У нас только текстовый узел
-                        if (textNode && textNode.nodeType === Node.TEXT_NODE) {
-                            const startOffset = Math.min(match.start, textNode.length);
-                            const endOffset = Math.min(match.end, textNode.length);
-                            
-                            range.setStart(textNode, startOffset);
-                            range.setEnd(textNode, endOffset);
-                            
-                            // Выделяем текст
-                            const selection = window.getSelection();
-                            selection.removeAllRanges();
-                            selection.addRange(range);
-                            
-                            // Прокручиваем к выделенному тексту
-                            editor.scrollIntoView({ 
-                                behavior: 'smooth', 
-                                block: 'center' 
-                            });
+
+                    this.recalculateMatches();
+
+                    if (this.searchMatches.length === 0) {
+                        this.currentMatchIndex = -1;
+                        return;
+                    }
+
+                    // Смещение курсора — ищем первое совпадение после него
+                    let cursorOffset = 0;
+                    const sel = window.getSelection();
+                    if (sel && sel.rangeCount > 0) {
+                        const range = sel.getRangeAt(0);
+                        const off = this.getOffsetFromNode(range.endContainer, range.endOffset);
+                        if (off >= 0) cursorOffset = off;
+                    }
+
+                    let found = -1;
+                    for (let i = 0; i < this.searchMatches.length; i++) {
+                        if (this.searchMatches[i].start >= cursorOffset) {
+                            found = i;
+                            break;
                         }
                     }
+                    if (found === -1) found = 0; // зацикливаем
+
+                    this.currentMatchIndex = found;
+                    this.highlightCurrent();
                 },
-                
-                // Очистка подсветок
-                clearHighlights() {
+
+                highlightCurrent() {
+                    if (this.currentMatchIndex < 0 || this.searchMatches.length === 0) return;
+
+                    const match = this.searchMatches[this.currentMatchIndex];
+                    const range = this.rangeFromOffsets(match.start, match.end);
+                    if (!range) return;
+
                     const selection = window.getSelection();
                     selection.removeAllRanges();
+                    selection.addRange(range);
+
+                    // Подскроллить к выделению
+                    const editor = this.$refs.editor;
+                    const rect = range.getBoundingClientRect();
+                    const editorRect = editor.getBoundingClientRect();
+                    if (rect.top < editorRect.top || rect.bottom > editorRect.bottom) {
+                        editor.scrollTop += rect.top - editorRect.top - editorRect.height / 2;
+                    }
                 },
-                
-                // Закрытие модального окна поиска
-                closeSearchModal() {
-                    this.showSearchModal = false;
-                    this.clearHighlights();
+
+                replaceCurrent() {
+                    if (this.currentMatchIndex < 0 || this.searchMatches.length === 0) return;
+
+                    const match = this.searchMatches[this.currentMatchIndex];
+                    const range = this.rangeFromOffsets(match.start, match.end);
+                    if (!range) return;
+
+                    range.deleteContents();
+                    const textNode = document.createTextNode(this.replaceTerm);
+                    range.insertNode(textNode);
+
+                    // Курсор — после вставленного текста
+                    range.setStartAfter(textNode);
+                    range.collapse(true);
+                    const selection = window.getSelection();
+                    selection.removeAllRanges();
+                    selection.addRange(range);
+
+                    this.$refs.editor.normalize();
+
+                    this.updateStats();
+                    this.scheduleHistorySave();
+                    this.scheduleSaveContent();
+
+                    // Пересчитываем совпадения в новом тексте
+                    this.recalculateMatches();
+
+                    if (this.searchMatches.length === 0) {
+                        this.currentMatchIndex = -1;
+                        return;
+                    }
+
+                    // Ищем первое совпадение после только что вставленного фрагмента
+                    const afterReplace = match.start + this.replaceTerm.length;
+                    let found = -1;
+                    for (let i = 0; i < this.searchMatches.length; i++) {
+                        if (this.searchMatches[i].start >= afterReplace) {
+                            found = i;
+                            break;
+                        }
+                    }
+                    if (found === -1) found = 0; // зацикливаем
+
+                    this.currentMatchIndex = found;
+                    this.highlightCurrent();
+                },
+
+                replaceAll() {
+                    if (!this.searchTerm) return;
+
+                    const editor = this.$refs.editor;
+                    const text = editor.textContent || '';
+                    const regex = new RegExp(
+                        this.escapeRegex(this.searchTerm),
+                        this.caseSensitive ? 'g' : 'gi'
+                    );
+                    const newText = text.replace(regex, this.replaceTerm);
+
+                    editor.textContent = newText;
+
+                    this.updateStats();
+                    this.scheduleHistorySave();
+                    this.scheduleSaveContent();
+
                     this.searchMatches = [];
                     this.currentMatchIndex = -1;
+                    this.clearSelection();
                 },
-                
-                // Экранирование специальных символов для регулярных выражений
+
                 escapeRegex(string) {
                     return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
                 }
