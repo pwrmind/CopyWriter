@@ -16,7 +16,6 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Редактор">
     <link rel="apple-touch-icon" id="apple-touch-icon">
-
     <link rel="icon" id="favicon">
 
     <!-- Bootstrap CSS -->
@@ -34,23 +33,24 @@
     <style>
         [x-cloak] { display: none !important; }
 
-        /* === ИСПРАВЛЕНИЕ: динамическая высота и запрет скролла body === */
+        /* === ИСПРАВЛЕНИЕ ВЫСОТЫ: fixed + inset покрывает экран целиком === */
         html, body {
             height: 100%;
-            height: 100dvh;
-            overflow: hidden;
             margin: 0;
             padding: 0;
+            overflow: hidden;
+            background-color: #343a40; /* чтобы белых зазоров не было видно */
         }
         body {
             font-family: 'Roboto', sans-serif;
-            background-color: #f8f9fa;
         }
 
         .editor-container {
-            height: 100%;
+            position: fixed;
+            inset: 0;
             display: flex;
             flex-direction: column;
+            background-color: #f8f9fa;
         }
 
         .toolbar {
@@ -114,7 +114,7 @@
             display: flex;
             overflow: hidden;
             background-color: #fff;
-            min-height: 0; /* важно для flex-контейнера */
+            min-height: 0;
         }
         .editor-area {
             flex: 1;
@@ -139,49 +139,45 @@
             line-height: 1.5;
         }
 
-        /* === ИСПРАВЛЕНИЕ: статус-бар с safe-area и адаптивным layout === */
+        /* === СТАТУС-БАР: одна строка, компактный, с safe-area снизу === */
         .status-bar {
             background-color: #343a40;
             color: #fff;
-            padding: 8px 12px;
-            /* Отступ снизу под системный индикатор iPhone */
-            padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px));
+            padding: 6px 12px;
+            /* Отступ снизу под home-индикатор iPhone */
+            padding-bottom: calc(6px + env(safe-area-inset-bottom, 0px));
             font-size: 13px;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            gap: 6px 16px;
+            gap: 10px;
             flex-shrink: 0;
             z-index: 2;
+            line-height: 1.3;
         }
-
-        .status-group {
-            display: flex;
-            gap: 12px;
-            flex-wrap: wrap;
-            align-items: center;
-        }
-
-        .status-item {
+        .status-bar .status-item {
             white-space: nowrap;
         }
 
-        /* Адаптив для узких экранов (iPhone) */
+        /* Адаптив для узких экранов */
         @media (max-width: 576px) {
             .toolbar-group { margin-right: 6px; }
             .toolbar-btn { padding: 5px 6px; }
             .search-panel .form-control { max-width: 130px; }
+
             .status-bar {
-                flex-direction: column;
-                align-items: flex-start;
-                gap: 4px;
-                font-size: 12px;
+                font-size: 11px;
+                padding: 5px 10px;
+                padding-bottom: calc(5px + env(safe-area-inset-bottom, 0px));
+                gap: 8px;
             }
-            .status-group {
-                width: 100%;
-                justify-content: space-between;
-                gap: 6px;
-            }
+            /* На мобильных показываем только компактный набор */
+            .status-bar .desktop-only { display: none; }
+        }
+
+        /* На широких экранах показываем расширенную версию */
+        @media (min-width: 577px) {
+            .status-bar .mobile-only { display: none; }
         }
 
         .offline-badge {
@@ -300,20 +296,28 @@
             </div>
         </div>
 
-        <!-- Статус-бар (ИСПРАВЛЕН) -->
+        <!-- Статус-бар: одна строка, компактный -->
         <div class="status-bar">
-            <div class="status-group">
-                <div class="status-item">
-                    Символов: <span x-text="stats.charactersWithSpaces"></span>
-                    (<span x-text="stats.charactersWithoutSpaces"></span> без пробелов)
-                </div>
-                <div class="status-item">Слов: <span x-text="stats.words"></span></div>
-            </div>
-            <div class="status-group">
-                <div class="status-item">Предложений: <span x-text="stats.sentences"></span></div>
-                <div class="status-item">Абзацев: <span x-text="stats.paragraphs"></span></div>
-                <div class="status-item">Время: ~<span x-text="stats.readingTime"></span> мин.</div>
-            </div>
+            <!-- Мобильная версия: только самое нужное -->
+            <span class="mobile-only status-item">
+                Символов: <span x-text="stats.charactersWithSpaces"></span>
+                · Слов: <span x-text="stats.words"></span>
+                · Предл.: <span x-text="stats.sentences"></span>
+                · Абз.: <span x-text="stats.paragraphs"></span>
+                · ~<span x-text="stats.readingTime"></span> мин
+            </span>
+
+            <!-- Десктопная версия: подробно -->
+            <span class="desktop-only status-item">
+                Символов: <span x-text="stats.charactersWithSpaces"></span>
+                (<span x-text="stats.charactersWithoutSpaces"></span> без пробелов)
+            </span>
+            <span class="desktop-only status-item">Слов: <span x-text="stats.words"></span></span>
+            <span class="desktop-only status-item">Предложений: <span x-text="stats.sentences"></span></span>
+            <span class="desktop-only status-item">Абзацев: <span x-text="stats.paragraphs"></span></span>
+            <span class="desktop-only status-item">
+                Время чтения: ~<span x-text="stats.readingTime"></span> мин.
+            </span>
         </div>
     </div>
 
@@ -344,7 +348,7 @@
                 display: 'standalone',
                 display_override: ['window-controls-overlay', 'standalone', 'minimal-ui'],
                 orientation: 'any',
-                background_color: '#f8f9fa',
+                background_color: '#343a40',
                 theme_color: '#343a40',
                 categories: ['productivity', 'utilities'],
                 icons: [
