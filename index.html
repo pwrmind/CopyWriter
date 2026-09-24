@@ -4,10 +4,28 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 
+    <!-- ===== Установка темы до отрисовки (без мигания) ===== -->
+    <script>
+        (function () {
+            try {
+                const saved = localStorage.getItem('editorTheme');
+                const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+                const theme = saved === 'dark' || saved === 'light'
+                    ? saved
+                    : (prefersDark ? 'dark' : 'light');
+                document.documentElement.setAttribute('data-bs-theme', theme);
+                document.documentElement.setAttribute('data-theme', theme);
+            } catch (e) {
+                document.documentElement.setAttribute('data-bs-theme', 'light');
+                document.documentElement.setAttribute('data-theme', 'light');
+            }
+        })();
+    </script>
+
     <title>Текстовый редактор для социальных сетей</title>
 
     <!-- ===== PWA ===== -->
-    <meta name="theme-color" content="#343a40">
+    <meta name="theme-color" content="#ffffff" id="theme-color-meta">
     <meta name="description" content="Плаин-текстовый редактор с поиском, заменой и статистикой">
     <link rel="manifest" id="pwa-manifest">
 
@@ -33,15 +51,48 @@
     <style>
         [x-cloak] { display: none !important; }
 
+        /* ===== Палитра (светлая тема) ===== */
+        :root {
+            --bg-root: #f8f9fa;
+            --bg-toolbar: #ffffff;
+            --bg-editor: #ffffff;
+            --bg-search: #f1f3f5;
+            --bg-status: #343a40;
+            --text-primary: #212529;
+            --text-editor: #212529;
+            --text-status: #ffffff;
+            --text-placeholder: #adb5bd;
+            --border-color: #dee2e6;
+            --btn-hover-bg: #f0f0f0;
+            --btn-hover-border: #dddddd;
+        }
+
+        /* ===== Палитра (тёмная тема) ===== */
+        [data-theme="dark"] {
+            --bg-root: #16191c;
+            --bg-toolbar: #212529;
+            --bg-editor: #1e1e1e;
+            --bg-search: #2b3035;
+            --bg-status: #16191c;
+            --text-primary: #e9ecef;
+            --text-editor: #e9ecef;
+            --text-status: #e9ecef;
+            --text-placeholder: #6c757d;
+            --border-color: #343a40;
+            --btn-hover-bg: #343a40;
+            --btn-hover-border: #495057;
+        }
+
         html, body {
             height: 100%;
             margin: 0;
             padding: 0;
             overflow: hidden;
-            background-color: #343a40;
+            background-color: var(--bg-root);
         }
         body {
             font-family: 'Roboto', sans-serif;
+            color: var(--text-primary);
         }
 
         .editor-container {
@@ -49,18 +100,20 @@
             inset: 0;
             display: flex;
             flex-direction: column;
-            background-color: #f8f9fa;
+            background-color: var(--bg-root);
+            transition: background-color 0.2s ease;
         }
 
-        /* Верхняя панель: белый фон уходит под системный статус-бар */
+        /* Верхняя панель: фон уходит под системный статус-бар */
         .toolbar {
-            background-color: #fff;
-            border-bottom: 1px solid #dee2e6;
+            background-color: var(--bg-toolbar);
+            border-bottom: 1px solid var(--border-color);
             padding: 8px 12px;
             padding-top: calc(8px + env(safe-area-inset-top, 0px));
             box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
             z-index: 2;
             flex-shrink: 0;
+            transition: background-color 0.2s ease, border-color 0.2s ease;
         }
 
         .toolbar-group {
@@ -78,11 +131,11 @@
             margin: 0 2px;
             cursor: pointer;
             transition: all 0.2s;
-            color: #333;
+            color: var(--text-primary);
         }
         .toolbar-btn:hover:not(:disabled) {
-            background-color: #f0f0f0;
-            border-color: #ddd;
+            background-color: var(--btn-hover-bg);
+            border-color: var(--btn-hover-border);
         }
         .toolbar-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
@@ -96,8 +149,8 @@
         .install-btn:hover { background-color: #0069d9; }
 
         .search-panel {
-            background-color: #f1f3f5;
-            border-bottom: 1px solid #dee2e6;
+            background-color: var(--bg-search);
+            border-bottom: 1px solid var(--border-color);
             padding: 8px 12px;
             display: flex;
             flex-wrap: wrap;
@@ -105,17 +158,24 @@
             align-items: center;
             z-index: 1;
             flex-shrink: 0;
+            transition: background-color 0.2s ease, border-color 0.2s ease;
         }
         .search-panel .form-control { max-width: 180px; }
-        .search-panel .match-info { font-size: 13px; color: #495057; margin-left: auto; }
+        .search-panel .match-info {
+            font-size: 13px;
+            color: var(--text-primary);
+            opacity: 0.75;
+            margin-left: auto;
+        }
 
         .editor-wrapper {
             position: relative;
             flex: 1;
             display: flex;
             overflow: hidden;
-            background-color: #fff;
+            background-color: var(--bg-editor);
             min-height: 0;
+            transition: background-color 0.2s ease;
         }
         .editor-area {
             flex: 1;
@@ -128,22 +188,26 @@
             line-height: 1.5;
             white-space: pre-wrap;
             word-wrap: break-word;
+            color: var(--text-editor);
+            caret-color: var(--text-editor);
+            transition: color 0.2s ease;
         }
         .editor-area:focus { box-shadow: inset 0 0 0 2px #007bff; }
 
         .editor-placeholder {
             position: absolute;
             top: 16px; left: 16px; right: 16px;
-            color: #adb5bd;
+            color: var(--text-placeholder);
             pointer-events: none;
             font-size: 16px;
             line-height: 1.5;
+            transition: color 0.2s ease;
         }
 
-        /* Статус-бар: обычные отступы, safe-area — в отдельном блоке ниже */
+        /* Статус-бар: safe-area вынесена в отдельный блок ниже */
         .status-bar {
-            background-color: #343a40;
-            color: #fff;
+            background-color: var(--bg-status);
+            color: var(--text-status);
             padding: 8px 12px;
             font-size: 13px;
             display: flex;
@@ -153,6 +217,7 @@
             flex-shrink: 0;
             z-index: 2;
             line-height: 1.3;
+            transition: background-color 0.2s ease;
         }
         .status-bar .status-item {
             white-space: nowrap;
@@ -161,8 +226,9 @@
         /* Тёмная полоса под home-индикатором iPhone */
         .safe-bottom {
             height: env(safe-area-inset-bottom, 0px);
-            background-color: #343a40;
+            background-color: var(--bg-status);
             flex-shrink: 0;
+            transition: background-color 0.2s ease;
         }
 
         @media (max-width: 576px) {
@@ -189,6 +255,11 @@
             border-radius: 3px;
             font-size: 12px;
             margin-left: 8px;
+        }
+
+        /* Кнопка темы */
+        .theme-btn {
+            font-size: 15px;
         }
     </style>
 </head>
@@ -247,6 +318,15 @@
                     <span class="offline-badge" x-show="!isOnline" x-cloak>
                         <i class="fas fa-wifi"></i> Офлайн
                     </span>
+
+                    <!-- Кнопка темы -->
+                    <button class="toolbar-btn theme-btn"
+                            :title="theme === 'dark' ? 'Светлая тема' : 'Тёмная тема'"
+                            :aria-label="theme === 'dark' ? 'Светлая тема' : 'Тёмная тема'"
+                            @click="toggleTheme">
+                        <i class="fas" :class="theme === 'dark' ? 'fa-sun' : 'fa-moon'"></i>
+                    </button>
+
                     <button class="toolbar-btn install-btn" x-show="canInstall" x-cloak
                             @click="installPWA" title="Установить приложение">
                         <i class="fas fa-download me-1"></i> Установить
@@ -278,7 +358,7 @@
                         из <span x-text="searchMatches.length"></span></span>
                 </template>
                 <template x-if="searchTerm && searchMatches.length === 0">
-                    <span class="text-muted">Нет совпадений</span>
+                    <span>Нет совпадений</span>
                 </template>
             </span>
         </div>
@@ -299,9 +379,8 @@
             </div>
         </div>
 
-        <!-- Статус-бар: одна строка, компактный -->
+        <!-- Статус-бар -->
         <div class="status-bar">
-            <!-- Мобильная версия: только самое нужное -->
             <span class="mobile-only status-item">
                 Символов: <span x-text="stats.charactersWithSpaces"></span>
                 · Слов: <span x-text="stats.words"></span>
@@ -310,7 +389,6 @@
                 · ~<span x-text="stats.readingTime"></span> мин
             </span>
 
-            <!-- Десктопная версия: подробно -->
             <span class="desktop-only status-item">
                 Символов: <span x-text="stats.charactersWithSpaces"></span>
                 (<span x-text="stats.charactersWithoutSpaces"></span> без пробелов)
@@ -391,6 +469,9 @@
                 selectedFont: 'Roboto',
                 selectedFontSize: 16,
 
+                // Тема
+                theme: document.documentElement.getAttribute('data-theme') || 'light',
+
                 showSearchPanel: false,
                 searchTerm: '',
                 replaceTerm: '',
@@ -412,6 +493,7 @@
                 onlineHandler: null,
                 offlineHandler: null,
                 installHandler: null,
+                mediaQueryHandler: null,
 
                 availableFonts: ['Roboto', 'Open Sans', 'Lato', 'Montserrat', 'Source Sans Pro'],
                 fontSizes: [12, 14, 16, 18, 20, 24, 28, 32],
@@ -426,7 +508,7 @@
                 },
 
                 init() {
-                    // --- Восстанавливаем настройки шрифта и поиска ---
+                    // --- Настройки ---
                     const savedFont = localStorage.getItem('editorFont');
                     if (savedFont && this.availableFonts.includes(savedFont)) {
                         this.selectedFont = savedFont;
@@ -442,7 +524,7 @@
                         this.caseSensitive = savedCase === 'true';
                     }
 
-                    // --- Восстанавливаем контент ---
+                    // --- Контент ---
                     const saved = localStorage.getItem('editorContent');
                     this.content = saved !== null ? saved : '';
                     this.$refs.editor.textContent = this.content;
@@ -456,6 +538,22 @@
                     this.history = [this.content];
                     this.historyIndex = 0;
                     this.updateStats();
+
+                    // Синхронизируем meta theme-color с текущей темой
+                    this.applyTheme(this.theme, false);
+
+                    // Следим за системной темой, пока пользователь не выбрал вручную
+                    if (window.matchMedia) {
+                        const mq = window.matchMedia('(prefers-color-scheme: dark)');
+                        this.mediaQueryHandler = (e) => {
+                            // Если пользователь не зафиксировал выбор — следуем системе
+                            if (!localStorage.getItem('editorTheme')) {
+                                this.applyTheme(e.matches ? 'dark' : 'light', false);
+                            }
+                        };
+                        if (mq.addEventListener) mq.addEventListener('change', this.mediaQueryHandler);
+                        else if (mq.addListener) mq.addListener(this.mediaQueryHandler);
+                    }
 
                     this.autosaveInterval = setInterval(() => this.saveContent(), 30000);
                     this.beforeUnloadHandler = () => {
@@ -491,6 +589,25 @@
                     if (this.installHandler) window.removeEventListener('beforeinstallprompt', this.installHandler);
                     this.saveContent();
                     this.saveSettings();
+                },
+
+                // --- Тема ---
+                toggleTheme() {
+                    const next = this.theme === 'dark' ? 'light' : 'dark';
+                    this.applyTheme(next, true);
+                },
+
+                applyTheme(theme, persist = true) {
+                    this.theme = theme;
+                    document.documentElement.setAttribute('data-bs-theme', theme);
+                    document.documentElement.setAttribute('data-theme', theme);
+
+                    const meta = document.getElementById('theme-color-meta');
+                    if (meta) meta.setAttribute('content', theme === 'dark' ? '#212529' : '#ffffff');
+
+                    if (persist) {
+                        try { localStorage.setItem('editorTheme', theme); } catch (e) {}
+                    }
                 },
 
                 async installPWA() {
